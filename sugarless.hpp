@@ -2,7 +2,7 @@
 #ifndef SUGARLESS_HPP
 #define SUGARLESS_HPP
 
-#include <vector>
+#include <initializer_list>
 #include <tuple>
 #include <unordered_map>
 #include <string>
@@ -57,7 +57,7 @@ class Command{
     Command(std::string &license_text) : license_txt_m(license_text) {}
     Command(std::string &&license_text) : license_txt_m(license_text) {}
     bool parse(int argc, const char *argv[], int arg_type=SPACE_TYPE);
-    Command &flag(std::string tag_name,std::vector<char> short_name={},std::vector<std::string> long_name={},std::string description_message="",bool need_arg=false,std::string default_val="");
+    Command &flag(std::string tag_name,std::initializer_list<char> short_name={},std::initializer_list<std::string> long_name={},std::string description_message="",bool need_arg=false,std::string default_val="");
     bool has(std::string tag_name);
     template<class T>
     T get(std::string tag_name);
@@ -324,7 +324,7 @@ bool Command::_equal_parse(int argc, const char *argv[]){
     return 1;
 }
 
-Command &Command::flag(std::string tag_name, std::vector<char> short_name, std::vector<std::string> long_name, std::string description_message, bool need_arg, std::string default_val){
+Command &Command::flag(std::string tag_name, std::initializer_list<char> short_name, std::initializer_list<std::string> long_name, std::string description_message, bool need_arg, std::string default_val){
     std::string str;
     if(short_name.size() != 0){
         str.push_back('(');
