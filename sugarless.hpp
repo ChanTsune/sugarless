@@ -1,4 +1,5 @@
-﻿#ifndef SUGARLESS_HPP
+﻿#pragma once
+#ifndef SUGARLESS_HPP
 #define SUGARLESS_HPP
 
 #include <vector>
@@ -43,8 +44,12 @@ class Command{
     bool __simple_string_parse(std::string &simple_string);
     bool __compound_short_name_parse(std::string &compound_short_name);
     bool _equal_parse(int argc, const char *argv[]);
+    template<size_t INDEX>
+    bool __equalIsMatch(std::string &target, std::string &target_arg);
     bool __equalArgSet(cmd_tuple &_Tuple, std::string &in_argv_i, std::string &target_arg);
     bool _space_parse(int argc, const char *argv[]);
+    template<size_t INDEX>
+    bool __spaceIsMatch(std::string &target_Str, int argc, const char *argv[], int &i, std::string &in_argv_i);
     bool __spaceArgSet(cmd_tuple &_Tuple, int argc, const char *argv[], int &i, std::string &in_argv_i);
 
   public:
@@ -67,11 +72,13 @@ class Command{
 
 };
 
-inline bool accessable_next_argv(int argc,int now){
+inline bool accessable_next_argv(int argc,int now)
+{
     return argc > now + 1;
 }
 
-bool Command::parse(int argc,const char *argv[],int arg_type){
+bool Command::parse(int argc,const char *argv[],int arg_type)
+{
 
     switch (arg_type)
     {
@@ -86,7 +93,8 @@ bool Command::parse(int argc,const char *argv[],int arg_type){
     return 0;
 }
 
-bool Command::__simple_string_parse(std::string &simple_string){
+bool Command::__simple_string_parse(std::string &simple_string)
+{
     for (auto &f : flag_items_m)
     {
         if (!std::get<SHORT_NAME>(f.second).mark_count() && !std::get<LONG_NAME>(f.second).mark_count() && std::get<ARG_VAL>(f.second).empty())
@@ -170,6 +178,38 @@ bool Command::__spaceArgSet(cmd_tuple &_Tuple,int argc,const char*argv[],int &i,
     }
     return 1;
 }
+template<size_t INDEX>
+bool Command::__equalIsMatch(std::string &target, std::string &target_arg)
+{
+    for (auto &f : flag_items_m)
+    {
+        if (std::regex_match(target, std::get<INDEX>(f.second))) //設定した文字列のいずれかに当てはまるか確認
+        {
+            if (!__equalArgSet(f.second, target, target_arg))
+            {
+                return 0;
+            }
+            std::get<IS_EXIST>(f.second) = true;
+        }
+    }
+    return 1;
+}
+template<size_t INDEX>
+bool Command::__spaceIsMatch(std::string &target_Str,int argc,const char *argv[],int &i,std::string &in_argv_i)
+{
+    for (auto &f : flag_items_m)
+    {
+        if (std::regex_match(target_Str, std::get<INDEX>(f.second))) //設定した文字列のいずれかに当てはまるか確認
+        {
+            if (!__spaceArgSet(f.second, argc, argv, i, in_argv_i))
+            {
+                return 0;
+            }
+            std::get<IS_EXIST>(f.second) = true;
+        }
+    }
+    return 1;
+}
 
 bool Command::__compound_short_name_parse(std::string &compound_short_name)
 {
@@ -208,32 +248,16 @@ bool Command::_space_parse(int argc, const char *argv[])
         std::smatch sub_much;
         if (isLongName(in_argv_i,sub_much))//long name
         {
-            std::string target = sub_much.str(1);//マッチさせる対象
-            for (auto &f : flag_items_m)//ここのループに改善の余地あり
+            if (!__spaceIsMatch<LONG_NAME>(sub_much.str(1), argc, argv, i, in_argv_i))
             {
-                if (std::regex_match(target, std::get<LONG_NAME>(f.second)))//long nameで設定した文字列のいずれかに当てはまるか確認
-                {
-                    if(!__spaceArgSet(f.second,argc,argv,i,in_argv_i))
-                    {
-                        return 0;
-                    }
-                    std::get<IS_EXIST>(f.second) = true;
-                }
+                return 0;
             }
         }
         else if(isShortName(in_argv_i,sub_much))//short name
         {
-            std::string target = sub_much.str(1);//マッチさせる対象
-            for(auto &f : flag_items_m)
+            if (!__spaceIsMatch<SHORT_NAME>(sub_much.str(1), argc, argv, i, in_argv_i))
             {
-                if (std::regex_match(target, std::get<SHORT_NAME>(f.second)))
-                {
-                    if (!__spaceArgSet(f.second, argc, argv, i, in_argv_i))
-                    {
-                        return 0;
-                    }
-                    std::get<IS_EXIST>(f.second) = true;
-                }
+                return 0;
             }
         }
         else if(isCompoundShortName(in_argv_i,sub_much))//複合short name
@@ -262,34 +286,16 @@ bool Command::_equal_parse(int argc, const char *argv[]){
         std::smatch sub_much;
         if (isLongName(in_argv_i, sub_much)) //long
         {
-            std::string target = sub_much.str(1);
-            std::string target_arg = sub_much.str(3);
-            for (auto &f : flag_items_m)
+            if (!__equalIsMatch<LONG_NAME>(sub_much.str(1), sub_much.str(3)))
             {
-                if (std::regex_match(target, std::get<LONG_NAME>(f.second))) //long nameで設定した文字列のいずれかに当てはまるか確認
-                {
-                    if (!__equalArgSet(f.second, target, target_arg))
-                    {
-                        return 0;
-                    }
-                    std::get<IS_EXIST>(f.second) = true;
-                }
+                return 0;
             }
         }
         else if (isShortName(in_argv_i, sub_much)) //short
         {
-            std::string target = sub_much.str(1); //マッチさせる対象
-            std::string target_arg = sub_much.str(3);
-            for (auto &f : flag_items_m)
+            if (!__equalIsMatch<SHORT_NAME>(sub_much.str(1), sub_much.str(3)))
             {
-                if (std::regex_match(target, std::get<SHORT_NAME>(f.second)))
-                {
-                    if (!__equalArgSet(f.second,target,target_arg))
-                    {
-                        return 0;
-                    }
-                    std::get<IS_EXIST>(f.second) = true;
-                }
+                return 0;
             }
         }
         else if (isCompoundShortName(in_argv_i, sub_much)) //compound short
@@ -354,7 +360,7 @@ bool Command::has(std::string tag_name){
 
 template<class T>
 T Command::get(std::string tag_name){
-    return (T)std::get<ARG_VAL>(flag_items_m[tag_name]);
+    return T(std::get<ARG_VAL>(flag_items_m[tag_name]));
 }
 
 
