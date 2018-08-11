@@ -93,7 +93,11 @@ inline bool accessable_next_argv(int argc,int now)
 {
     return argc > now + 1;
 }
-
+template<typename ... Args>
+inline auto eprintf_s(const char* format_str,Args const & ... args)
+{
+    return fprintf_s(stderr,format_str,args ...);
+}
 bool Command::parse(int argc,const char *argv[],int arg_style)
 {
     bool result;
@@ -113,7 +117,7 @@ bool Command::parse(int argc,const char *argv[],int arg_style)
             result = _unix_parse(argc,argv);
             break;
         default:
-            fprintf_s(stderr, "sugarless::Command::parse : received an invalid %d value for the third argument.\n the third argument must be EQUAL_STYLE, SPACE_STYLE or UNIX_STYLE.", arg_style);
+            eprintf_s("sugarless::Command::parse : received an invalid %d value for the third argument.\n the third argument must be EQUAL_STYLE, SPACE_STYLE or UNIX_STYLE.", arg_style);
             result = false;
             break;
     }
@@ -185,14 +189,14 @@ bool Command::__spaceArgSet(cmd_tuple &_Tuple,int argc,const char*argv[],int &i,
                 }
                 else
                 {
-                    fprintf_s(stderr, "Invalid '--' received.");
+                    eprintf_s("Invalid '--' received.");
                 }
             }
             else if (std::regex_match(next_arg, std::regex("-(.+)"))) //引数パラメータの形をとっているか確認
             {                                                    //-X又は--xxの形式をとっていた場合
                 if (std::get<DEF_VAL>(_Tuple).empty())
                 { //デフォルト引数が設定されていない場合
-                    fprintf_s(stderr, "%s option need argument.\n", in_argv_i.c_str());
+                    eprintf_s("%s option need argument.\n", in_argv_i.c_str());
                     return 0;
                 }
                 else
@@ -209,7 +213,7 @@ bool Command::__spaceArgSet(cmd_tuple &_Tuple,int argc,const char*argv[],int &i,
         { //出来ない場合
             if (std::get<DEF_VAL>(_Tuple).empty())
             { //デフォルト引数が設定されていない場合
-                fprintf_s(stderr, "%s option need argument.\n", in_argv_i.c_str());
+                eprintf_s("%s option need argument.\n", in_argv_i.c_str());
                 return 0;
             }
             else
@@ -232,8 +236,10 @@ bool Command::__equalIsMatch(std::string &target, std::string &target_arg)
                 return 0;
             }
             std::get<IS_EXIST>(f.second) = true;
+            return 1;
         }
     }
+    eprintf_s("Unknown option %s is ignored\n",target.c_str());
     return 1;
 }
 template<size_t INDEX>
@@ -248,8 +254,10 @@ bool Command::__spaceIsMatch(std::string &target_Str,int argc,const char *argv[]
                 return 0;
             }
             std::get<IS_EXIST>(f.second) = true;
+            return 1;
         }
     }
+    eprintf_s("Unknown option %s is ignored\n", target_Str.c_str());
     return 1;
 }
 
@@ -328,7 +336,7 @@ bool Command::_space_parse(int argc, const char *argv[])
         }
         else
         {
-            fprintf_s(stderr,"Invalid '--' received.");
+            eprintf_s("Invalid '--' received.");
             return 0;
         }
     }//end for
@@ -390,7 +398,7 @@ bool Command::_equal_parse(int argc, const char *argv[])
         }
         else
         {
-            fprintf_s(stderr, "Invalid '--' received.");
+            eprintf_s("Invalid '--' received.");
             return 0;
         }
     }
@@ -451,7 +459,7 @@ bool Command::_unix_parse(int argc, const char *argv[])
         }
         else
         {
-            fprintf_s(stderr, "Invalid '--' received.");
+            eprintf_s("Invalid '--' received.");
             return 0;
         }
     }
@@ -480,7 +488,6 @@ Command &Command::flag(std::string tag_name, std::initializer_list<char> short_n
         }
         str.pop_back();
         str.push_back(')');
-//        fprintf_s(stderr,"%s\n",str.c_str());
     }
     std::regex short_names(str.begin(), str.end());
     str.clear();
@@ -497,7 +504,6 @@ Command &Command::flag(std::string tag_name, std::initializer_list<char> short_n
         }
         str.pop_back();
         str.push_back(')');
-//        fprintf_s(stderr, "%s\n", str.c_str());
     }
     if (!description_message.empty())
     {
@@ -532,7 +538,7 @@ T Command::get(std::string tag_name){
 void Command::show_help(void)
 //今後の課題　表示の成形
 {
-    fprintf_s(stderr,"%s\n",get_help().c_str());
+    eprintf_s("%s\n",get_help().c_str());
 }
 
 std::string Command::get_help(void)
