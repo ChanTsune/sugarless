@@ -9,7 +9,8 @@
 #include <regex>
 
 namespace sugarless{
-enum arg_style{
+enum arg_style
+{
     EQUAL_STYLE,
     SPACE_STYLE,
     UNIX_STYLE
@@ -18,7 +19,8 @@ enum arg_style{
 typedef std::tuple<std::regex, std::regex, std::string, bool, std::string, bool, std::string> cmd_tuple;
 class Command{
   private:
-    std::unordered_map<std::string, cmd_tuple > flag_items_m;
+    bool auto_help_m;
+    std::unordered_map<std::string, cmd_tuple> flag_items_m;
     std::string app_name_m;
     std::string arguments_text_m;
     std::string options_text_m;
@@ -55,29 +57,36 @@ class Command{
     bool __spaceIsMatch(std::string &target_Str, int argc, const char *argv[], int &i, std::string &in_argv_i);
     bool __spaceArgSet(cmd_tuple &_Tuple, int argc, const char *argv[], int &i, std::string &in_argv_i);
     bool _unix_parse(int argc,const char *argv[]);
-    void auto_help(void);
+    void _auto_help(bool is_auto_help);
 
   public:
-    Command(bool auto_help=true){};
-    Command(std::string &app_name,bool auto_help=true) : app_name_m(app_name) {}
-    Command(std::string &&app_name,bool auto_help=true) : app_name_m(app_name) {}
+    Command(bool auto_help=true):auto_help_m(auto_help){
+        _auto_help(auto_help);
+    };
+    Command(std::string &app_name,bool auto_help=true) : app_name_m(app_name) ,auto_help_m(auto_help){
+        _auto_help(auto_help);
+    }
+    Command(std::string &&app_name,bool auto_help=true) : app_name_m(app_name),auto_help_m(auto_help){
+        _auto_help(auto_help);
+    }
     bool parse(int argc, const char *argv[], int arg_style=UNIX_STYLE);
     Command &argument(std::string tag_name, std::string description_message="",std::string default_val="");
     Command &flag(std::string tag_name, std::initializer_list<char> short_name={}, std::initializer_list<std::string> long_name={}, std::string description_message="", bool need_arg=false, std::string default_val="");
     bool has(std::string tag_name);
     template<class T>
     T get(std::string tag_name);
-    //====//
     void show_help();
     std::string get_help(void);
     void get_help(std::string &dst);
-    //====//
 
 };
 
-void Command::auto_help(void)
+void Command::_auto_help(bool is_auto_help)
 {
-    flag("help",{'h'},{"help"},"show this message.");
+    if(is_auto_help)
+    {
+        flag("help",{'h'},{"help"},"show this message");
+    }
 }
 
 inline bool accessable_next_argv(int argc,int now)
@@ -87,20 +96,32 @@ inline bool accessable_next_argv(int argc,int now)
 
 bool Command::parse(int argc,const char *argv[],int arg_style)
 {
-
+    bool result;
+    if(app_name_m.empty())
+    {
+        app_name_m = std::string(argv[0]);
+    }
     switch (arg_style)
     {
         case EQUAL_STYLE:
-            return _equal_parse(argc,argv);
+            result = _equal_parse(argc,argv);
+            break;
         case SPACE_STYLE:
-            return _space_parse(argc,argv);
+            result = _space_parse(argc,argv);
+            break;
         case UNIX_STYLE:
-            return _unix_parse(argc,argv);
+            result = _unix_parse(argc,argv);
+            break;
         default:
-            fprintf_s(stderr, "sugarless::Command::parse : received an invalid %d value for the third argument.",arg_style);
+            fprintf_s(stderr, "sugarless::Command::parse : received an invalid %d value for the third argument.\n the third argument must be EQUAL_STYLE, SPACE_STYLE or UNIX_STYLE.", arg_style);
+            result = false;
             break;
     }
-    return 0;
+    if (auto_help_m && (!result || has("help")))
+    {
+        show_help();
+    }
+    return result;
 }
 
 bool Command::__simple_string_parse(std::string &simple_string)
@@ -439,16 +460,21 @@ bool Command::_unix_parse(int argc, const char *argv[])
 
 Command &Command::argument(std::string tag_name, std::string description_message, std::string default_val)
 {
-    return flag(tag_name, {}, {},"",false,default_val);
+    return flag(tag_name, {}, {}, description_message, false, default_val);
 }
 
 Command &Command::flag(std::string tag_name, std::initializer_list<char> short_name, std::initializer_list<std::string> long_name, std::string description_message, bool need_arg, std::string default_val)
 {
+    std::string tmp;
     std::string str;
     if(short_name.size() != 0){
         str.push_back('(');
         for (auto &c : short_name)
         {
+            tmp.push_back('-');
+            tmp.push_back(c);
+            tmp.push_back(' ');
+            //for regex process
             str.push_back(c);
             str.push_back('|');
         }
@@ -462,6 +488,10 @@ Command &Command::flag(std::string tag_name, std::initializer_list<char> short_n
         str.push_back('(');
         for (auto &c : long_name)
         {
+            tmp += "--";
+            tmp += c;
+            tmp.push_back(' ');
+            //for regex process
             str += c;
             str.push_back('|');
         }
@@ -469,8 +499,26 @@ Command &Command::flag(std::string tag_name, std::initializer_list<char> short_n
         str.push_back(')');
 //        fprintf_s(stderr, "%s\n", str.c_str());
     }
+    if (!description_message.empty())
+    {
+        tmp += "\t:";
+        tmp += description_message;
+    }
     std::regex long_names(str.begin(), str.end());
     flag_items_m[tag_name] = std::make_tuple(short_names,long_names,description_message,need_arg,default_val,0,"");
+    
+    if (short_name.size() || long_name.size()) {
+        options_text_m += tmp;
+        options_text_m.push_back('\n');
+    }
+    else
+    {
+        arguments_text_m += tag_name;
+        arguments_text_m += tmp;
+        arguments_text_m.push_back('\n');
+    }
+        
+
     return *this;
 }
 bool Command::has(std::string tag_name){
@@ -481,17 +529,34 @@ template<class T>
 T Command::get(std::string tag_name){
     return T(std::get<ARG_VAL>(flag_items_m[tag_name]));
 }
-/*
 void Command::show_help(void)
+//今後の課題　表示の成形
 {
     fprintf_s(stderr,"%s\n",get_help().c_str());
 }
 
 std::string Command::get_help(void)
 {
-    return app_name_m+arguments_text_m+options_text_m;
+    std::string text;
+    text += app_name_m + "\n\n";
+    if(!arguments_text_m.empty())
+    {
+        text += "Argments:\n";
+        text += arguments_text_m;
+        text += "\n";
+    }
+    if(!options_text_m.empty())
+    {
+        text += "Options:\n";
+        text += options_text_m;
+        text += "\n";
+    }
+    return text;
 }
-*/
+void Command::get_help(std::string &dst)
+{
+    dst.swap(get_help());
+}
 
 /* Templates Specialization */
 template<>

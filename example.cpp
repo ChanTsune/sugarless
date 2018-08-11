@@ -4,11 +4,11 @@
 using namespace std;
 int main(int argc, char const *argv[])
 {
-    sugarless::Command cmd = sugarless::Command();
-                            cmd.argument("in_file");
-                            cmd.flag("overwrite",{'w','r'},{"overwrite"},"overwrite input file")
-                            .flag("output",{'o'},{"output"},"output file name",true,"./a.out")
-                            .flag("max",{'M'},{"max"},"max size",true);
+    sugarless::Command cmd(std::string("waifu2x++"));
+        cmd.argument("in_file", "input file");
+        cmd.flag("overwrite", {'w', 'r'}, {"overwrite"}, "overwrite input file")
+        .flag("output", {'o'}, {"output"}, "output file name", true, "./a.out")
+        .flag("max", {'M'}, {"max"}, "max size", true);
 
     if(!cmd.parse(argc,argv,sugarless::arg_style::UNIX_STYLE)){
         cout << "parse error" << endl;
