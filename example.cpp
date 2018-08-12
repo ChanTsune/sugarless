@@ -28,7 +28,7 @@ int main(int argc, char const *argv[])
         cout << cmd.get<string>("output") << endl;
     }
     if(cmd.has("max")){
-        cout << "max is" << cmd.get<string>("max") << endl;
+        cout << "max is " << cmd.get<int>("max") << endl;
     }
 
     return 0;

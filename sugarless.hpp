@@ -73,8 +73,14 @@ class Command{
     Command &argument(std::string tag_name, std::string description_message="",std::string default_val="");
     Command &flag(std::string tag_name, std::initializer_list<char> short_name={}, std::initializer_list<std::string> long_name={}, std::string description_message="", bool need_arg=false, std::string default_val="");
     bool has(std::string tag_name);
-    template<class T>
-    T get(std::string tag_name);
+    template <typename T>
+    typename std::enable_if_t<std::is_signed_v<T>, T> get(std::string tag_name);
+    template <typename T>
+    typename std::enable_if_t<std::is_unsigned_v<T>, T> get(std::string tag_name);
+    template <typename T>
+    typename std::enable_if_t<std::is_floating_point_v<T>, T> get(std::string tag_name);
+    template <typename T>
+    typename std::enable_if_t<!std::is_signed_v<T> && !std::is_unsigned_v<T> && !std::is_floating_point_v<T>, T> get(std::string tag_name);
     void show_help();
     std::string get_help(void);
     void get_help(std::string &dst);
@@ -531,8 +537,24 @@ bool Command::has(std::string tag_name){
     return std::get<IS_EXIST>(flag_items_m[tag_name]);
 }
 
-template<class T>
-T Command::get(std::string tag_name){
+template <typename T>
+typename std::enable_if_t<std::is_signed_v<T>, T> Command::get(std::string tag_name)
+{
+    return std::stoll(std::get<ARG_VAL>(flag_items_m[tag_name]));
+}
+template <typename T>
+typename std::enable_if_t<std::is_unsigned_v<T>, T> Command::get(std::string tag_name)
+{
+    return std::stoull(std::get<ARG_VAL>(flag_items_m[tag_name]));
+}
+template <typename T>
+typename std::enable_if_t<std::is_floating_point_v<T>, T> Command::get(std::string tag_name)
+{
+    return std::stold(std::get<ARG_VAL>(flag_items_m[tag_name]));
+}
+template <typename T>
+typename std::enable_if_t<!std::is_signed_v<T> && !std::is_unsigned_v<T> && !std::is_floating_point_v<T>, T> Command::get(std::string tag_name)
+{
     return T(std::get<ARG_VAL>(flag_items_m[tag_name]));
 }
 void Command::show_help(void)
@@ -562,20 +584,6 @@ std::string Command::get_help(void)
 void Command::get_help(std::string &dst)
 {
     dst.swap(get_help());
-}
-
-/* Templates Specialization */
-template<>
-int Command::get<int>(std::string tag_name){
-    return std::stol(std::get<ARG_VAL>(flag_items_m[tag_name]));
-}
-template<>
-unsigned int Command::get<unsigned int>(std::string tag_name){
-    return std::stoul(std::get<ARG_VAL>(flag_items_m[tag_name]));
-}
-template<>
-std::string Command::get<std::string>(std::string tag_name){
-    return std::get<ARG_VAL>(flag_items_m[tag_name]);
 }
 
 
