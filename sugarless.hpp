@@ -74,9 +74,9 @@ class Command{
     Command &flag(std::string tag_name, std::initializer_list<char> short_name={}, std::initializer_list<std::string> long_name={}, std::string description_message="", bool need_arg=false, std::string default_val="");
     bool has(std::string tag_name);
     template <typename T>
-    typename std::enable_if_t<std::is_signed_v<T>, T> get(std::string tag_name);
+    typename std::enable_if_t<std::is_signed_v<T> && std::is_integral_v<T>, T> get(std::string tag_name);
     template <typename T>
-    typename std::enable_if_t<std::is_unsigned_v<T>, T> get(std::string tag_name);
+    typename std::enable_if_t<std::is_unsigned_v<T> && std::is_integral_v<T>, T> get(std::string tag_name);
     template <typename T>
     typename std::enable_if_t<std::is_floating_point_v<T>, T> get(std::string tag_name);
     template <typename T>
@@ -538,12 +538,12 @@ bool Command::has(std::string tag_name){
 }
 
 template <typename T>
-typename std::enable_if_t<std::is_signed_v<T>, T> Command::get(std::string tag_name)
+typename std::enable_if_t<std::is_signed_v<T> && std::is_integral_v<T>, T> Command::get(std::string tag_name)
 {
     return std::stoll(std::get<ARG_VAL>(flag_items_m[tag_name]));
 }
 template <typename T>
-typename std::enable_if_t<std::is_unsigned_v<T>, T> Command::get(std::string tag_name)
+typename std::enable_if_t<std::is_unsigned_v<T> && std::is_integral_v<T>, T> Command::get(std::string tag_name)
 {
     return std::stoull(std::get<ARG_VAL>(flag_items_m[tag_name]));
 }
