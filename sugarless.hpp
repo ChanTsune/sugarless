@@ -59,7 +59,8 @@ class Command{
   public:
     Command(const char *app_name, int argc, const char *argv[], bool auto_help=true);
     Command(int argc, const char *argv[], bool auto_help=true);
-    bool parse(int arg_style=UNIX_STYLE);
+    template <arg_style style=UNIX_STYLE>
+    bool parse();
     Command &argument(std::string tag_name, std::string description_message="",std::string default_val="");
     Command &flag(std::string tag_name, std::initializer_list<char> short_name={}, std::initializer_list<std::string> long_name={}, std::string description_message="", bool need_arg=false, std::string default_val="");
     bool has(std::string tag_name);
@@ -107,28 +108,47 @@ inline auto eprintf_s(const char* format_str,Args const & ... args)
 {
     return fprintf_s(stderr,format_str,args ...);
 }
-bool Command::parse(int arg_style)
+template <arg_style style>
+bool Command::parse()
 {
-    bool result;
-    switch (arg_style)
+    eprintf_s("sugarless::Command::parse : received an invalid template argument %d \n the template argument must be EQUAL_STYLE, SPACE_STYLE, UNIX_STYLE or WINDOWS_STYLE.", style);
+    return false;
+}
+
+template<>
+bool Command::parse<arg_style::EQUAL_STYLE>()
+{
+    bool result = _equal_parse(argc,argv);
+    if (auto_help_m && (!result || has("help")))
     {
-        case EQUAL_STYLE:
-            result = _equal_parse(argc,argv);
-            break;
-        case SPACE_STYLE:
-            result = _space_parse(argc,argv);
-            break;
-        case UNIX_STYLE:
-            result = _unix_parse(argc,argv);
-            break;
-        case WINDOWS_STYLE:
-            result = _windows_parse(argc,argv);
-            break;
-        default:
-            eprintf_s("sugarless::Command::parse : received an invalid %d value for the third argument.\n the third argument must be EQUAL_STYLE, SPACE_STYLE or UNIX_STYLE.", arg_style);
-            result = false;
-            break;
+        show_help();
     }
+    return result;
+}
+template <>
+bool Command::parse<arg_style::SPACE_STYLE>()
+{
+    bool result = _space_parse(argc, argv);
+    if (auto_help_m && (!result || has("help")))
+    {
+        show_help();
+    }
+    return result;
+}
+template <>
+bool Command::parse<arg_style::UNIX_STYLE>()
+{
+    bool result = _unix_parse(argc, argv);
+    if (auto_help_m && (!result || has("help")))
+    {
+        show_help();
+    }
+    return result;
+}
+template <>
+bool Command::parse<arg_style::WINDOWS_STYLE>()
+{
+    bool result = _windows_parse(argc, argv);
     if (auto_help_m && (!result || has("help")))
     {
         show_help();

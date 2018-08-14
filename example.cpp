@@ -10,7 +10,8 @@ int main(int argc, char const *argv[])
         .flag("output", {'o'}, {"output"}, "output file name", true, "./a.out")
         .flag("max", {'M'}, {"max"}, "max size", true);
 
-    if(!cmd.parse(sugarless::arg_style::WINDOWS_STYLE)){
+    if (!cmd.parse<sugarless::arg_style::WINDOWS_STYLE>())
+    {
         cout << "parse error" << endl;
     }
 
