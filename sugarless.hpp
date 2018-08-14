@@ -13,13 +13,16 @@ enum arg_style
 {
     EQUAL_STYLE,
     SPACE_STYLE,
-    UNIX_STYLE
+    UNIX_STYLE,
+    WINDOWS_STYLE,
 };
 
 typedef std::tuple<std::regex, std::regex, std::string, bool, std::string, bool, std::string> cmd_tuple;
 class Command{
   private:
     bool auto_help_m;
+    int argc;
+    const char** argv;
     std::unordered_map<std::string, cmd_tuple> flag_items_m;
     std::string app_name_m;
     std::string arguments_text_m;
@@ -34,18 +37,10 @@ class Command{
         IS_EXIST,
         ARG_VAL
     };
-    bool isLongName(const std::string &_Str,std::smatch &_Re)
-    {
-        return std::regex_match(_Str, _Re, std::regex("--(.+?)(=(.+))?"));
-    }
-    bool isShortName(const std::string &_Str,std::smatch &_Re)
-    {
-        return std::regex_match(_Str, _Re, std::regex("-(.)(=(.+))?"));
-    }
-    bool isCompoundShortName(const std::string &_Str, std::smatch &_Re)
-    {
-        return std::regex_match(_Str, _Re, std::regex("-(.+?)(=(.+))?"));
-    }
+    bool isLongName(const std::string &_Str,std::smatch &_Re) { return std::regex_match(_Str, _Re, std::regex("--(.+?)(=(.+))?")); }
+    bool isShortName(const std::string &_Str,std::smatch &_Re) { return std::regex_match(_Str, _Re, std::regex("-(.)(=(.+))?")); }
+    bool isCompoundShortName(const std::string &_Str, std::smatch &_Re){ return std::regex_match(_Str, _Re, std::regex("-(.+?)(=(.+))?")); }
+    bool isWindowsStyleName(const std::string &_Str,std::smatch &_Re) { return std::regex_match(_Str,_Re,std::regex("(/|-)(.+?)(:(.+))?")); }
     bool __simple_string_parse(std::string &simple_string);
     bool __compound_short_name_parse(std::string &compound_short_name);
     bool _equal_parse(int argc, const char *argv[]);
@@ -57,19 +52,14 @@ class Command{
     bool __spaceIsMatch(std::string &target_Str, int argc, const char *argv[], int &i, std::string &in_argv_i);
     bool __spaceArgSet(cmd_tuple &_Tuple, int argc, const char *argv[], int &i, std::string &in_argv_i);
     bool _unix_parse(int argc,const char *argv[]);
-    void _auto_help(bool is_auto_help);
+    bool _windows_parse(int argc, const char*argv[]);
+    bool __winIsMatch(std::string &target, std::string &target_arg);
+    void _auto_help();
 
   public:
-    Command(bool auto_help=true):auto_help_m(auto_help){
-        _auto_help(auto_help);
-    };
-    Command(std::string &app_name,bool auto_help=true) : app_name_m(app_name) ,auto_help_m(auto_help){
-        _auto_help(auto_help);
-    }
-    Command(std::string &&app_name,bool auto_help=true) : app_name_m(app_name),auto_help_m(auto_help){
-        _auto_help(auto_help);
-    }
-    bool parse(int argc, const char *argv[], int arg_style=UNIX_STYLE);
+    Command(const char *app_name, int argc, const char *argv[], bool auto_help=true);
+    Command(int argc, const char *argv[], bool auto_help=true);
+    bool parse(int arg_style=UNIX_STYLE);
     Command &argument(std::string tag_name, std::string description_message="",std::string default_val="");
     Command &flag(std::string tag_name, std::initializer_list<char> short_name={}, std::initializer_list<std::string> long_name={}, std::string description_message="", bool need_arg=false, std::string default_val="");
     bool has(std::string tag_name);
@@ -87,9 +77,22 @@ class Command{
 
 };
 
-void Command::_auto_help(bool is_auto_help)
+/* constructor */
+
+Command::Command(const char *app_name, int argc, const char *argv[], bool auto_help) : app_name_m(app_name) ,argc(argc) ,argv(argv) ,auto_help_m(auto_help)
 {
-    if(is_auto_help)
+    _auto_help();
+}
+
+Command::Command(int argc, const char *argv[], bool auto_help) : app_name_m(argv[0]), argc(argc), argv(argv), auto_help_m(auto_help)
+{
+    _auto_help();
+}
+
+/* end constructor */
+void Command::_auto_help()
+{
+    if(auto_help_m)
     {
         flag("help",{'h'},{"help"},"show this message");
     }
@@ -104,13 +107,9 @@ inline auto eprintf_s(const char* format_str,Args const & ... args)
 {
     return fprintf_s(stderr,format_str,args ...);
 }
-bool Command::parse(int argc,const char *argv[],int arg_style)
+bool Command::parse(int arg_style)
 {
     bool result;
-    if(app_name_m.empty())
-    {
-        app_name_m = std::string(argv[0]);
-    }
     switch (arg_style)
     {
         case EQUAL_STYLE:
@@ -121,6 +120,9 @@ bool Command::parse(int argc,const char *argv[],int arg_style)
             break;
         case UNIX_STYLE:
             result = _unix_parse(argc,argv);
+            break;
+        case WINDOWS_STYLE:
+            result = _windows_parse(argc,argv);
             break;
         default:
             eprintf_s("sugarless::Command::parse : received an invalid %d value for the third argument.\n the third argument must be EQUAL_STYLE, SPACE_STYLE or UNIX_STYLE.", arg_style);
@@ -444,6 +446,64 @@ bool Command::_unix_parse(int argc, const char *argv[])
                 else
                 {
                     fprintf(stderr, "%s can not given argument.\n", in_argv_i.c_str());
+                    return 0;
+                }
+            }
+            else // simple string
+            {
+                if (!__simple_string_parse(in_argv_i))
+                {
+                    return 0;
+                }
+            }
+        }
+        else if (accessable_next_argv(argc, i))
+        {
+            in_argv_i = std::string(argv[++i]);
+            if (!__simple_string_parse(in_argv_i))
+            {
+                return 0;
+            }
+        }
+        else
+        {
+            eprintf_s("Invalid '--' received.");
+            return 0;
+        }
+    }
+    return 1;
+}
+
+bool Command::__winIsMatch(std::string &target, std::string &target_arg)
+{
+    for(auto&f:flag_items_m)
+    {
+        if(std::regex_match(target,std::get<LONG_NAME>(f.second)) || std::regex_match(target,std::get<SHORT_NAME>(f.second)))
+        {
+            if(!__equalArgSet(f.second,target,target_arg))
+            {
+                return 0;
+            }
+            std::get<IS_EXIST>(f.second) = true;
+            return 1;
+        }
+    }
+    eprintf_s("Unknown option %s is ignored\n", target.c_str());
+    return 1;
+}
+
+bool Command::_windows_parse(int argc ,const char *argv[])
+{
+    for (int i = 1; i < argc; i++)
+    {
+        std::string in_argv_i(argv[i]);
+        std::smatch sub_much;
+        if (in_argv_i != "--")
+        {
+            if (isWindowsStyleName(in_argv_i, sub_much))
+            {
+                if(!__winIsMatch(sub_much.str(2),sub_much.str(4)))
+                {
                     return 0;
                 }
             }
