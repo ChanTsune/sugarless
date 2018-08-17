@@ -7,20 +7,21 @@
 #include <unordered_map>
 #include <string>
 #include <regex>
+#include <ostream>
 
 namespace sugarless{
-enum arg_style
+enum parse_style
 {
     EQUAL_STYLE,
     SPACE_STYLE,
-    UNIX_STYLE,
+    SUGARLESS_STYLE,
     WINDOWS_STYLE,
 };
-
 typedef std::tuple<std::regex, std::regex, std::string, bool, std::string, bool, std::string> cmd_tuple;
 class Command{
   private:
     bool auto_help_m;
+    int parse_style_m;
     int argc;
     const char** argv;
     std::unordered_map<std::string, cmd_tuple> flag_items_m;
@@ -59,8 +60,7 @@ class Command{
   public:
     Command(const char *app_name, int argc, const char *argv[], bool auto_help=true);
     Command(int argc, const char *argv[], bool auto_help=true);
-    template <arg_style style=UNIX_STYLE>
-    bool parse();
+    bool parse(int style=SUGARLESS_STYLE);
     Command &argument(std::string tag_name, std::string description_message="",std::string default_val="");
     Command &flag(std::string tag_name, std::initializer_list<char> short_name={}, std::initializer_list<std::string> long_name={}, std::string description_message="", bool need_arg=false, std::string default_val="");
     bool has(std::string tag_name);
@@ -76,6 +76,8 @@ class Command{
     std::string get_help(void);
     void get_help(std::string &dst);
 
+    template <class _Elme, class _Traits>
+    friend std::basic_ostream<_Elme, _Traits> &operator<<(std::basic_ostream<_Elme, _Traits> &stream, const Command &self);
 };
 
 /* constructor */
@@ -108,47 +110,27 @@ inline auto eprintf_s(const char* format_str,Args const & ... args)
 {
     return fprintf_s(stderr,format_str,args ...);
 }
-template <arg_style style>
-bool Command::parse()
+bool Command::parse(int style)
 {
-    eprintf_s("sugarless::Command::parse : received an invalid template argument %d \n the template argument must be EQUAL_STYLE, SPACE_STYLE, UNIX_STYLE or WINDOWS_STYLE.", style);
-    return false;
-}
-
-template<>
-bool Command::parse<arg_style::EQUAL_STYLE>()
-{
-    bool result = _equal_parse(argc,argv);
-    if (auto_help_m && (!result || has("help")))
+    bool result = false;
+    switch (style)
     {
-        show_help();
+    case EQUAL_STYLE:
+        result = _equal_parse(argc, argv);
+        break;
+    case SPACE_STYLE:
+        result = _space_parse(argc, argv);
+        break;
+    case SUGARLESS_STYLE:
+        result = _unix_parse(argc, argv);
+        break;
+    case WINDOWS_STYLE:
+        result = _windows_parse(argc, argv);
+        break;
+    default:
+        eprintf_s("sugarless::Command::parse : received an invalid template argument %d \n the template argument must be EQUAL_STYLE, SPACE_STYLE, SUGARLESS_STYLE or WINDOWS_STYLE.", style);
+        break;
     }
-    return result;
-}
-template <>
-bool Command::parse<arg_style::SPACE_STYLE>()
-{
-    bool result = _space_parse(argc, argv);
-    if (auto_help_m && (!result || has("help")))
-    {
-        show_help();
-    }
-    return result;
-}
-template <>
-bool Command::parse<arg_style::UNIX_STYLE>()
-{
-    bool result = _unix_parse(argc, argv);
-    if (auto_help_m && (!result || has("help")))
-    {
-        show_help();
-    }
-    return result;
-}
-template <>
-bool Command::parse<arg_style::WINDOWS_STYLE>()
-{
-    bool result = _windows_parse(argc, argv);
     if (auto_help_m && (!result || has("help")))
     {
         show_help();
@@ -666,6 +648,27 @@ void Command::get_help(std::string &dst)
     dst.swap(get_help());
 }
 
+/* operator */
+template <class _Elme, class _Traits>
+std::basic_ostream<_Elme, _Traits> &operator<<(std::basic_ostream<_Elme, _Traits> &stream, const Command &self)
+{
+    stream << "Parse style : " << self.parse_style_m << endl;
+    stream << "Options state :" << endl;
+    stream << std::boolalpha;
+    stream << " tag name\t| exist\t| value\t| default value" << endl;
+    for(auto &f : self.flag_items_m)
+    {
+        stream << " " << f.first << "\t: "
+               << std::get<Command::IS_EXIST>(f.second) << "\t: "
+               << std::get<Command::ARG_VAL>(f.second) << "\t: "
+               << std::get<Command::DEF_VAL>(f.second) 
+               << endl;
+    }
+    stream << noboolalpha;
+    return stream;
+}
+
+/* end operator */
 
 }// end nemaspace sugarless
 #endif //include gard SUGARLESS_HPP
