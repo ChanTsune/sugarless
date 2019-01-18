@@ -2,673 +2,207 @@
 #ifndef SUGARLESS_HPP
 #define SUGARLESS_HPP
 
-#include <initializer_list>
-#include <tuple>
-#include <unordered_map>
+#include <map>
 #include <string>
-#include <regex>
+#include <cstring>
+#include <vector>
 #include <ostream>
 
-namespace sugarless{
-enum parse_style
+namespace sugarless
 {
-    EQUAL_STYLE,
-    SPACE_STYLE,
-    SUGARLESS_STYLE,
-    WINDOWS_STYLE,
-};
-typedef std::tuple<std::regex, std::regex, std::string, bool, std::string, bool, std::string> cmd_tuple;
-class Command{
-  private:
-    bool auto_help_m;
-    int parse_style_m;
-    int argc;
-    const char** argv;
-    std::unordered_map<std::string, cmd_tuple> flag_items_m;
-    std::string app_name_m;
-    std::string arguments_text_m;
-    std::string options_text_m;
-    enum flag_index
+template<class _Elme>
+inline bool startswith(const srd::basic_string<_Elme> target,const srd::basic_string<_Elme> suffix, int start=0, int end=INT_MAX)
+{
+  int len = target.size();
+  int sublen = suffix.size();
+  const _Elme *self = target.c_str();
+  const _Elme *sub = suffix.c_str();
+
+  if (start + sublen > len)
+  {
+    return false;
+  }
+  if (end - start >= sublen)
+  {
+    return (!std::memcmp(self + start * sizeof(_Elme), sub, sublen * sizeof(_Elme)));
+  }
+  return false;
+}
+
+class Flag
+{
+    public:
+    std::string short_name;
+    std::string long_name;
+    std::string argument;
+    bool require_argument;
+    bool exist;
+    Flag(void){};
+    Flag(const char* short_name,const char * long_name,bool require_argument,const char * argument)
     {
-        SHORT_NAME,
-        LONG_NAME,
-        D_MESSAGE,
-        NEED_ARG,
-        DEF_VAL,
-        IS_EXIST,
-        ARG_VAL
-    };
-    bool isLongName(const std::string &_Str,std::smatch &_Re) { return std::regex_match(_Str, _Re, std::regex("--(.+?)(=(.+))?")); }
-    bool isShortName(const std::string &_Str,std::smatch &_Re) { return std::regex_match(_Str, _Re, std::regex("-(.)(=(.+))?")); }
-    bool isCompoundShortName(const std::string &_Str, std::smatch &_Re){ return std::regex_match(_Str, _Re, std::regex("-(.+?)(=(.+))?")); }
-    bool isWindowsStyleName(const std::string &_Str,std::smatch &_Re) { return std::regex_match(_Str,_Re,std::regex("(/|-)(.+?)(:(.+))?")); }
-    bool __simple_string_parse(std::string &simple_string);
-    bool __compound_short_name_parse(std::string &compound_short_name);
-    bool _equal_parse(int argc, const char *argv[]);
-    template<size_t INDEX>
-    bool __equalIsMatch(std::string &target, std::string &target_arg);
-    bool __equalArgSet(cmd_tuple &_Tuple, std::string &in_argv_i, std::string &target_arg);
-    bool _space_parse(int argc, const char *argv[]);
-    template<size_t INDEX>
-    bool __spaceIsMatch(std::string &target_Str, int argc, const char *argv[], int &i, std::string &in_argv_i);
-    bool __spaceArgSet(cmd_tuple &_Tuple, int argc, const char *argv[], int &i, std::string &in_argv_i);
-    bool _unix_parse(int argc,const char *argv[]);
-    bool _windows_parse(int argc, const char*argv[]);
-    bool __winIsMatch(std::string &target, std::string &target_arg);
-    void _auto_help();
+        this->short_name = short_name;
+        this->long_name = long_name;
+        this->require_argument = require_argument;
+        this->argument = argument;
+        this->exist = false;
+    }
+};
+
+class Command
+{
+  private:
+    std::map<std::string,Flag,std::less<>> flags;
+    std::map<std::string,Command,std::less<>> sub_commands;
+    bool exist;
 
   public:
-    Command(const char *app_name, int argc, const char *argv[], bool auto_help=true);
-    Command(int argc, const char *argv[], bool auto_help=true);
-    bool parse(int style=SUGARLESS_STYLE);
-    Command &argument(std::string tag_name, std::string description_message="",std::string default_val="");
-    Command &flag(std::string tag_name, std::initializer_list<char> short_name={}, std::initializer_list<std::string> long_name={}, std::string description_message="", bool need_arg=false, std::string default_val="");
-    bool has(std::string tag_name);
-    template <typename T>
-    typename std::enable_if_t<std::is_signed_v<T> && std::is_integral_v<T>, T> get(std::string tag_name);
-    template <typename T>
-    typename std::enable_if_t<std::is_unsigned_v<T> && std::is_integral_v<T>, T> get(std::string tag_name);
-    template <typename T>
-    typename std::enable_if_t<std::is_floating_point_v<T>, T> get(std::string tag_name);
-    template <typename T>
-    typename std::enable_if_t<!std::is_signed_v<T> && !std::is_unsigned_v<T> && !std::is_floating_point_v<T>, T> get(std::string tag_name);
-    void show_help();
-    std::string get_help(void);
-    void get_help(std::string &dst);
+    std::vector<char *> others;
+
+    bool parse(int argc,char const* argv[],int position=1);
+    Command &flag(const char *id, const char *short_name, const char *long_name, bool require_argument=false, const char * default_argument="");
+    Command &flag(const char *id, const char *short_name, const char *long_name, const char * default_argument);
+    bool has(const char *id);
+    const char *get(const char *id);
+
+    Command &sub_command(const char *command_name,Command &cmd,bool inheritanc=false);
+    bool has_sub_command(const char*command_name);
+    Command get_subcommand(const char *command_name);
 
     template <class _Elme, class _Traits>
     friend std::basic_ostream<_Elme, _Traits> &operator<<(std::basic_ostream<_Elme, _Traits> &stream, const Command &self);
 };
 
-/* constructor */
-
-Command::Command(const char *app_name, int argc, const char *argv[], bool auto_help) : app_name_m(app_name) ,argc(argc) ,argv(argv) ,auto_help_m(auto_help)
-{
-    _auto_help();
-}
-
-Command::Command(int argc, const char *argv[], bool auto_help) : app_name_m(argv[0]), argc(argc), argv(argv), auto_help_m(auto_help)
-{
-    _auto_help();
-}
-
-/* end constructor */
-void Command::_auto_help()
-{
-    if(auto_help_m)
-    {
-        flag("help",{'h'},{"help"},"show this message");
-    }
-}
-
-inline bool accessable_next_argv(int argc,int now)
-{
-    return argc > now + 1;
-}
-template<typename ... Args>
-inline auto eprintf_s(const char* format_str,Args const & ... args)
-{
-    return fprintf_s(stderr,format_str,args ...);
-}
-bool Command::parse(int style)
-{
-    bool result = false;
-    switch (style)
-    {
-    case EQUAL_STYLE:
-        result = _equal_parse(argc, argv);
-        break;
-    case SPACE_STYLE:
-        result = _space_parse(argc, argv);
-        break;
-    case SUGARLESS_STYLE:
-        result = _unix_parse(argc, argv);
-        break;
-    case WINDOWS_STYLE:
-        result = _windows_parse(argc, argv);
-        break;
-    default:
-        eprintf_s("sugarless::Command::parse : received an invalid template argument %d \n the template argument must be EQUAL_STYLE, SPACE_STYLE, SUGARLESS_STYLE or WINDOWS_STYLE.", style);
-        break;
-    }
-    if (auto_help_m && (!result || has("help")))
-    {
-        show_help();
-    }
-    return result;
-}
-
-bool Command::__simple_string_parse(std::string &simple_string)
-{
-    for (auto &f : flag_items_m)
-    {
-        if (!std::get<SHORT_NAME>(f.second).mark_count() && !std::get<LONG_NAME>(f.second).mark_count() && std::get<ARG_VAL>(f.second).empty())
-        {
-            std::get<ARG_VAL>(f.second) = simple_string;
-            std::get<IS_EXIST>(f.second) = true;
-            return 1;
-        }
-    }
-    return 0;
-}
-
-bool Command::__equalArgSet(cmd_tuple &_Tuple, std::string &target, std::string &target_arg)
-{
-    if (std::get<NEED_ARG>(_Tuple)) //引数を必要とするオプションか確認
-    {
-        if (target_arg.empty())
-        {
-            if (std::get<DEF_VAL>(_Tuple).empty())
-            {
-                fprintf(stderr, "%s option need argument.\n", target.c_str());
-                return 0;
-            }
-            else
-            {
-                std::get<ARG_VAL>(_Tuple) = target_arg;
-            }
-        }
-        else
-        {
-            std::get<ARG_VAL>(_Tuple) = target_arg;
-        }
-    }
-    else
-    {
-        if (!target_arg.empty())
-        {
-            fprintf(stderr, "%s option do not need argument.\n", target.c_str());
-            return 0;
-        }
-    }
-    return 1;
-}
-
-bool Command::__spaceArgSet(cmd_tuple &_Tuple,int argc,const char*argv[],int &i,std::string &in_argv_i)
-{
-    if (std::get<NEED_ARG>(_Tuple)) //引数を必要とするオプションか確認
-    {
-        if (accessable_next_argv(argc, i)) //次の要素にアクセスできるか確認
-        {                                  //できる場合
-            std::string next_arg(argv[++i]);
-            if(next_arg == "--")
-            {
-                if(accessable_next_argv(argc,i))
-                {
-                    std::get<ARG_VAL>(_Tuple) = std::string(argv[++i]);
-                }
-                else
-                {
-                    eprintf_s("Invalid '--' received.");
-                }
-            }
-            else if (std::regex_match(next_arg, std::regex("-(.+)"))) //引数パラメータの形をとっているか確認
-            {                                                    //-X又は--xxの形式をとっていた場合
-                if (std::get<DEF_VAL>(_Tuple).empty())
-                { //デフォルト引数が設定されていない場合
-                    eprintf_s("%s option need argument.\n", in_argv_i.c_str());
-                    return 0;
-                }
-                else
-                { //されている場合
-                    std::get<ARG_VAL>(_Tuple) = std::get<DEF_VAL>(_Tuple);
-                }
-            }
-            else
-            { //-や--で始まらない通常文字列の場合
-                std::get<ARG_VAL>(_Tuple) = next_arg;
-            }
-        }
-        else
-        { //出来ない場合
-            if (std::get<DEF_VAL>(_Tuple).empty())
-            { //デフォルト引数が設定されていない場合
-                eprintf_s("%s option need argument.\n", in_argv_i.c_str());
-                return 0;
-            }
-            else
-            { //されている場合
-                std::get<ARG_VAL>(_Tuple) = std::get<DEF_VAL>(_Tuple);
-            }
-        }
-    }
-    return 1;
-}
-template<size_t INDEX>
-bool Command::__equalIsMatch(std::string &target, std::string &target_arg)
-{
-    for (auto &f : flag_items_m)
-    {
-        if (std::regex_match(target, std::get<INDEX>(f.second))) //設定した文字列のいずれかに当てはまるか確認
-        {
-            if (!__equalArgSet(f.second, target, target_arg))
-            {
-                return 0;
-            }
-            std::get<IS_EXIST>(f.second) = true;
-            return 1;
-        }
-    }
-    eprintf_s("Unknown option %s is ignored\n",target.c_str());
-    return 1;
-}
-template<size_t INDEX>
-bool Command::__spaceIsMatch(std::string &target_Str,int argc,const char *argv[],int &i,std::string &in_argv_i)
-{
-    for (auto &f : flag_items_m)
-    {
-        if (std::regex_match(target_Str, std::get<INDEX>(f.second))) //設定した文字列のいずれかに当てはまるか確認
-        {
-            if (!__spaceArgSet(f.second, argc, argv, i, in_argv_i))
-            {
-                return 0;
-            }
-            std::get<IS_EXIST>(f.second) = true;
-            return 1;
-        }
-    }
-    eprintf_s("Unknown option %s is ignored\n", target_Str.c_str());
-    return 1;
-}
-
-bool Command::__compound_short_name_parse(std::string &compound_short_name)
-{
-    for (int i = 0; i < compound_short_name.size(); ++i)
-    {
-        std::string target = {compound_short_name[i]};
-        for (auto &f : flag_items_m)
-        {
-            if (std::regex_match(target, std::get<SHORT_NAME>(f.second)))
-            {
-                if (std::get<NEED_ARG>(f.second)) //引数が必要なオプションかどうか
-                {
-                    if (std::get<DEF_VAL>(f.second).empty())
-                    {
-                        fprintf(stderr, "%s option need argument.\n", target.c_str());
-                        return 0;
-                    }
-                    else
-                    {
-                        std::get<ARG_VAL>(f.second) = std::get<DEF_VAL>(f.second);
-                    }
-                }
-                std::get<IS_EXIST>(f.second) = true;
-            }
-        }
-    }
-    return 1;
-}
-
-bool Command::_space_parse(int argc, const char *argv[])
-{
-    for(int i = 1; i < argc; i++)
-    {
-        std::string in_argv_i(argv[i]);
-        std::smatch sub_much;
-        if (in_argv_i != "--")
-        {
-            if (isLongName(in_argv_i, sub_much)) //long name
-            {
-                if (!__spaceIsMatch<LONG_NAME>(sub_much.str(1), argc, argv, i, in_argv_i))
-                {
-                    return 0;
-                }
-            }
-            else if (isShortName(in_argv_i, sub_much)) //short name
-            {
-                if (!__spaceIsMatch<SHORT_NAME>(sub_much.str(1), argc, argv, i, in_argv_i))
-                {
-                    return 0;
-                }
-            }
-            else if (isCompoundShortName(in_argv_i, sub_much)) //複合short name
-            {
-                if (!__compound_short_name_parse(sub_much.str(1)))
-                {
-                    return 0;
-                }
-            }
-            else //simple string
-            {
-                if (!__simple_string_parse(in_argv_i))
-                {
-                    return 0;
-                }
-            }
-        }
-        else if(accessable_next_argv(argc,i))
-        {
-            in_argv_i = std::string(argv[++i]);
-            if (!__simple_string_parse(in_argv_i))
-            {
-                return 0;
-            }
-        }
-        else
-        {
-            eprintf_s("Invalid '--' received.");
-            return 0;
-        }
-    }//end for
-    return 1;
-}
-
-bool Command::_equal_parse(int argc, const char *argv[])
-{
-    for(int i = 1; i < argc; i++)
-    {
-        std::string in_argv_i(argv[i]);
-        std::smatch sub_much;
-        if(in_argv_i != "--")
-        {
-            if (isLongName(in_argv_i, sub_much)) //long
-            {
-                if (!__equalIsMatch<LONG_NAME>(sub_much.str(1), sub_much.str(3)))
-                {
-                    return 0;
-                }
-            }
-            else if (isShortName(in_argv_i, sub_much)) //short
-            {
-                if (!__equalIsMatch<SHORT_NAME>(sub_much.str(1), sub_much.str(3)))
-                {
-                    return 0;
-                }
-            }
-            else if (isCompoundShortName(in_argv_i, sub_much)) //compound short
-            {
-                if (sub_much.str(3).empty())
-                {
-                    if (!__compound_short_name_parse(sub_much.str(1)))
-                    {
-                        return 0;
-                    }
-                }
-                else
-                {
-                    fprintf(stderr, "%s can not given argument.\n", in_argv_i.c_str());
-                    return 0;
-                }
-            }
-            else // simple string
-            {
-                if (!__simple_string_parse(in_argv_i))
-                {
-                    return 0;
-                }
-            }
-        }
-        else if (accessable_next_argv(argc, i))
-        {
-            in_argv_i = std::string(argv[++i]);
-            if (!__simple_string_parse(in_argv_i))
-            {
-                return 0;
-            }
-        }
-        else
-        {
-            eprintf_s("Invalid '--' received.");
-            return 0;
-        }
-    }
-    return 1;
-}
-bool Command::_unix_parse(int argc, const char *argv[])
-{
-    for(int i = 1; i < argc; i++)
-    {
-        std::string in_argv_i(argv[i]);
-        std::smatch sub_much;
-        if (in_argv_i != "--")
-        {
-            if (isLongName(in_argv_i, sub_much)) //long
-            {
-                if (!__equalIsMatch<LONG_NAME>(sub_much.str(1), sub_much.str(3)))
-                {
-                    return 0;
-                }
-            }
-            else if (isShortName(in_argv_i, sub_much)) //short
-            {
-                if (!__spaceIsMatch<SHORT_NAME>(sub_much.str(1), argc, argv, i, in_argv_i))
-                {
-                    return 0;
-                }
-            }
-            else if (isCompoundShortName(in_argv_i, sub_much)) //compound short
-            {
-                if (sub_much.str(3).empty())
-                {
-                    if (!__compound_short_name_parse(sub_much.str(1)))
-                    {
-                        return 0;
-                    }
-                }
-                else
-                {
-                    fprintf(stderr, "%s can not given argument.\n", in_argv_i.c_str());
-                    return 0;
-                }
-            }
-            else // simple string
-            {
-                if (!__simple_string_parse(in_argv_i))
-                {
-                    return 0;
-                }
-            }
-        }
-        else if (accessable_next_argv(argc, i))
-        {
-            in_argv_i = std::string(argv[++i]);
-            if (!__simple_string_parse(in_argv_i))
-            {
-                return 0;
-            }
-        }
-        else
-        {
-            eprintf_s("Invalid '--' received.");
-            return 0;
-        }
-    }
-    return 1;
-}
-
-bool Command::__winIsMatch(std::string &target, std::string &target_arg)
-{
-    for(auto&f:flag_items_m)
-    {
-        if(std::regex_match(target,std::get<LONG_NAME>(f.second)) || std::regex_match(target,std::get<SHORT_NAME>(f.second)))
-        {
-            if(!__equalArgSet(f.second,target,target_arg))
-            {
-                return 0;
-            }
-            std::get<IS_EXIST>(f.second) = true;
-            return 1;
-        }
-    }
-    eprintf_s("Unknown option %s is ignored\n", target.c_str());
-    return 1;
-}
-
-bool Command::_windows_parse(int argc ,const char *argv[])
-{
-    for (int i = 1; i < argc; i++)
-    {
-        std::string in_argv_i(argv[i]);
-        std::smatch sub_much;
-        if (in_argv_i != "--")
-        {
-            if (isWindowsStyleName(in_argv_i, sub_much))
-            {
-                if(!__winIsMatch(sub_much.str(2),sub_much.str(4)))
-                {
-                    return 0;
-                }
-            }
-            else // simple string
-            {
-                if (!__simple_string_parse(in_argv_i))
-                {
-                    return 0;
-                }
-            }
-        }
-        else if (accessable_next_argv(argc, i))
-        {
-            in_argv_i = std::string(argv[++i]);
-            if (!__simple_string_parse(in_argv_i))
-            {
-                return 0;
-            }
-        }
-        else
-        {
-            eprintf_s("Invalid '--' received.");
-            return 0;
-        }
-    }
-    return 1;
-}
-
-Command &Command::argument(std::string tag_name, std::string description_message, std::string default_val)
-{
-    return flag(tag_name, {}, {}, description_message, false, default_val);
-}
-
-Command &Command::flag(std::string tag_name, std::initializer_list<char> short_name, std::initializer_list<std::string> long_name, std::string description_message, bool need_arg, std::string default_val)
-{
-    std::string tmp;
-    std::string str;
-    if(short_name.size() != 0){
-        str.push_back('(');
-        for (auto &c : short_name)
-        {
-            tmp.push_back('-');
-            tmp.push_back(c);
-            tmp.push_back(' ');
-            //for regex process
-            str.push_back(c);
-            str.push_back('|');
-        }
-        str.pop_back();
-        str.push_back(')');
-    }
-    std::regex short_names(str.begin(), str.end());
-    str.clear();
-    if(long_name.size() !=0){
-        str.push_back('(');
-        for (auto &c : long_name)
-        {
-            tmp += "--";
-            tmp += c;
-            tmp.push_back(' ');
-            //for regex process
-            str += c;
-            str.push_back('|');
-        }
-        str.pop_back();
-        str.push_back(')');
-    }
-    if (!description_message.empty())
-    {
-        tmp += "\t:";
-        tmp += description_message;
-    }
-    std::regex long_names(str.begin(), str.end());
-    flag_items_m[tag_name] = std::make_tuple(short_names,long_names,description_message,need_arg,default_val,0,"");
-    
-    if (short_name.size() || long_name.size()) {
-        options_text_m += tmp;
-        options_text_m.push_back('\n');
-    }
-    else
-    {
-        arguments_text_m += tag_name;
-        arguments_text_m += tmp;
-        arguments_text_m.push_back('\n');
-    }
-        
-
-    return *this;
-}
-bool Command::has(std::string tag_name){
-    return std::get<IS_EXIST>(flag_items_m[tag_name]);
-}
-
-template <typename T>
-typename std::enable_if_t<std::is_signed_v<T> && std::is_integral_v<T>, T> Command::get(std::string tag_name)
-{
-    return std::stoll(std::get<ARG_VAL>(flag_items_m[tag_name]));
-}
-template <typename T>
-typename std::enable_if_t<std::is_unsigned_v<T> && std::is_integral_v<T>, T> Command::get(std::string tag_name)
-{
-    return std::stoull(std::get<ARG_VAL>(flag_items_m[tag_name]));
-}
-template <typename T>
-typename std::enable_if_t<std::is_floating_point_v<T>, T> Command::get(std::string tag_name)
-{
-    return std::stold(std::get<ARG_VAL>(flag_items_m[tag_name]));
-}
-template <typename T>
-typename std::enable_if_t<!std::is_signed_v<T> && !std::is_unsigned_v<T> && !std::is_floating_point_v<T>, T> Command::get(std::string tag_name)
-{
-    return T(std::get<ARG_VAL>(flag_items_m[tag_name]));
-}
-void Command::show_help(void)
-//今後の課題　表示の成形
-{
-    eprintf_s("%s\n",get_help().c_str());
-}
-
-std::string Command::get_help(void)
-{
-    std::string text;
-    text += app_name_m + "\n\n";
-    if(!arguments_text_m.empty())
-    {
-        text += "Argments:\n";
-        text += arguments_text_m;
-        text += "\n";
-    }
-    if(!options_text_m.empty())
-    {
-        text += "Options:\n";
-        text += options_text_m;
-        text += "\n";
-    }
-    return text;
-}
-void Command::get_help(std::string &dst)
-{
-    dst.swap(get_help());
-}
 
 /* operator */
 template <class _Elme, class _Traits>
 std::basic_ostream<_Elme, _Traits> &operator<<(std::basic_ostream<_Elme, _Traits> &stream, const Command &self)
 {
-    stream << "Parse style : " << self.parse_style_m << endl;
-    stream << "Options state :" << endl;
-    stream << std::boolalpha;
-    stream << " tag name\t| exist\t| value\t| default value" << endl;
-    for(auto &f : self.flag_items_m)
-    {
-        stream << " " << f.first << "\t: "
-               << std::get<Command::IS_EXIST>(f.second) << "\t: "
-               << std::get<Command::ARG_VAL>(f.second) << "\t: "
-               << std::get<Command::DEF_VAL>(f.second) 
-               << endl;
-    }
-    stream << noboolalpha;
+    stream  << "Parse style : " << self << std::endl
+            << "Options state :" << std::endl
+            << std::boolalpha
+            << " tag name\t| exist\t| value\t| default value" << std::endl;
+
+
+    stream << std::noboolalpha;
     return stream;
 }
 
 /* end operator */
 
+
+bool Command::parse(int argc,char const* argv[],int position)
+{
+    bool is_arg = false; // -- がよく前に指定された場合T、次は必ず引数として振る舞うかあるいはothersに突っ込まれる
+    bool req_arg = false;//直前のオプションが引数を必要とする場合にT
+    bool set_default = false; // 直前のオプションにデフォルト引数が指定されている時にT
+    std::string previous_flag_id="";
+    for(; i < argc; ++position)
+    {
+        std::string strargv(argv[position]);
+        if(!is_arg && strargv == "--")
+        {
+            is_arg = true;
+            continue;
+        }
+        if(startswith(strargv,"--"))// long
+        {
+            for(auto&& flg:this->flags)
+            {
+                if (startswith(strargv,flg.second.long_name,2))
+                {
+                    flg.second.exist = true;
+                    
+                    if (flg.second.require_argument)
+                    {
+                        if (flg.second.long_name.size() > strargv.size() - 2)
+                        {//ここで＝分割指定と＝無し結合指定を探す
+                           split(strargv.substr(2),"=",l,r);//--部分を取り除いたコマンドラインからのロング名
+                           //右側が空でなければそれを引数の値として確定する
+                           //右側が空、かつ左側の長さとロング名の長さが同じ場合は--long=のような変な指定の仕方なのでエラー
+                           //右側が空、かつ左がロング名より長い場合は左側の先頭からロング名の長さ分削ったものを引数の値とする
+                        }
+                        else//綺麗にロング名だけを指定された場合
+                        {
+                            req_arg = true;
+                            if (/* デフォルト引数を持っていた場合*/) {
+                                set_default = true;
+                            }
+                        }
+                    }
+                    else //引数を要求しないオプション
+                    {//フラグを全て無効にする
+
+                    }
+                    continue;
+                }
+                
+            }
+        }
+        else if ()// short
+        {
+            /* code */
+        }
+        
+        else
+        {
+            for(auto&& sb:this->sub_commands)
+            {
+                if(sb.first==strargv)
+                {
+                    return sb.second.parse(argc,argv,position);
+                }
+            }
+            this->others.push_back(argv[position]);
+        }
+    }
+    return 1;
+}
+
+Command &Command::flag(const char *id, const char *short_name, const char *long_name, bool require_argument, const char * default_argument)
+{
+    //TODO:NULL chack frase
+    this->flags[std::string(id)] = Flag(short_name,long_name,require_argument,default_argument);
+    return *this;
+}
+Command &Command::flag(const char *id, const char *short_name, const char *long_name, const char * default_argument)
+{
+    this->flags[std::string(id)] = Flag(short_name,long_name,true,default_argument);
+    return *this;
+}
+bool Command::has(const char *id)
+{
+    return this->flags[std::string(id)].exist;
+}
+const char *Command::get(const char *id)
+{
+    return this->flags[std::string(id)].argument.c_str();
+}
+
+Command &Command::sub_command(const char *command_name,Command &cmd,bool inheritanc)
+{
+    // TODO: refactor map merge
+    if (inheritanc) {
+        for(auto&& flg:this->flags)
+        {
+            cmd.flags[flg.first] = flg.second;
+        }
+    }
+    this->sub_commands[std::string(command_name)] = cmd;
+    return *this;
+}
+bool Command::has_sub_command(const char*command_name)
+{
+    return this->sub_commands[std::string(command_name)].exist;
+}
+
+Command Command::get_subcommand(const char *command_name)
+{
+    return this->sub_commands[std::string(command_name)];
+}
+
+
+
+
 }// end nemaspace sugarless
+
 #endif //include gard SUGARLESS_HPP
