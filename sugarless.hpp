@@ -8,10 +8,37 @@
 #include <vector>
 #include <ostream>
 
+#include <iostream>
+
 namespace sugarless
 {
+const static std::string empty_str("");
+const static std::string short_token("-");
+const static std::string connect_token("=");
+const static std::string long_token("--");
+const static std::string argument_flag("--");
+
 template<class _Elme>
-inline bool startswith(const srd::basic_string<_Elme> target,const srd::basic_string<_Elme> suffix, int start=0, int end=INT_MAX)
+inline size_t partition(std::basic_string<_Elme> target,std::basic_string<_Elme> sep, std::basic_string<_Elme> &dst1, std::basic_string<_Elme> &dst2, std::basic_string<_Elme> &dst3)
+{
+  size_t index = target.find(sep);
+  if (index == std::basic_string<_Elme>::npos)
+  {
+    dst1 = target;
+    dst2 = empty_str;
+    dst3 = empty_str;
+  }
+  else
+  {
+    dst1 = target.substr(0, index);
+    dst2 = sep;
+    dst3 = target.substr(index + sep.size());
+  }
+  return index;
+}
+
+template<class _Elme>
+inline bool startswith(const std::basic_string<_Elme> target,const std::basic_string<_Elme> suffix, int start=0, int end=INT_MAX)
 {
   int len = target.size();
   int sublen = suffix.size();
@@ -48,6 +75,33 @@ class Flag
     }
 };
 
+enum
+{
+    OK,
+    MISSING_ARGUMENT,
+    INVALID_FLAG,
+};
+
+const static char * OK_MESSAGE = "parse complete";
+const static char * MISSING_ARGUMENT_MESSAGE = "require argument";
+const static char * INVALID_FLAG_MESSAGE = " invalid option";
+
+const char * get_error_message(int errno)
+{
+    switch (errno)
+    {
+        case OK:
+            return OK_MESSAGE;
+        case MISSING_ARGUMENT:
+            return MISSING_ARGUMENT_MESSAGE;
+        case INVALID_FLAG:
+            return INVALID_FLAG_MESSAGE;
+        default:
+            break;
+    }
+    return OK_MESSAGE;
+}
+
 class Command
 {
   private:
@@ -55,11 +109,16 @@ class Command
     std::map<std::string,Command,std::less<>> sub_commands;
     bool exist;
 
+    bool is_long_name(std::string &name);
+    bool is_short_name(std::string &name);
+
+    bool is_opt(std::string &name);
+
   public:
     std::vector<char *> others;
 
-    bool parse(int argc,char const* argv[],int position=1);
-    Command &flag(const char *id, const char *short_name, const char *long_name, bool require_argument=false, const char * default_argument="");
+    int parse(int argc,char const* argv[],int position=1);
+    Command &flag(const char *id, const char *short_name, const char *long_name, bool require_argument=false, const char * default_argument=empty_str.c_str());
     Command &flag(const char *id, const char *short_name, const char *long_name, const char * default_argument);
     bool has(const char *id);
     const char *get(const char *id);
@@ -77,85 +136,174 @@ class Command
 template <class _Elme, class _Traits>
 std::basic_ostream<_Elme, _Traits> &operator<<(std::basic_ostream<_Elme, _Traits> &stream, const Command &self)
 {
-    stream  << "Parse style : " << self << std::endl
-            << "Options state :" << std::endl
-            << std::boolalpha
-            << " tag name\t| exist\t| value\t| default value" << std::endl;
-
-
-    stream << std::noboolalpha;
+    for(auto &&subc:self.sub_commands)
+    {
+        stream << std::boolalpha
+                << subc.first << " ::: " << std::endl
+                << subc.second << std::endl 
+                << std::noboolalpha;
+    }
+    
+    for(auto &&flg: self.flags )
+    {
+        stream << std::boolalpha
+                << flg.first << " : " << flg.second.exist << std::endl
+                << "argumens : " << flg.second.argument << std::endl
+                << std::noboolalpha;
+    }
     return stream;
 }
 
 /* end operator */
 
 
-bool Command::parse(int argc,char const* argv[],int position)
+inline bool Command::is_long_name(std::string &name)
 {
-    bool is_arg = false; // -- がよく前に指定された場合T、次は必ず引数として振る舞うかあるいはothersに突っ込まれる
+    return startswith(name, long_token);
+}
+
+inline bool Command::is_short_name(std::string &name)
+{
+    return startswith(name,short_token);
+}
+
+inline bool Command::is_opt(std::string &name)
+{
+    return this->is_short_name(name) || this->is_short_name(name);
+}
+
+
+int Command::parse(int argc,char const* argv[],int position)
+{
+    bool forced_arg = false; // -- がよく前に指定された場合T、次は必ず引数として振る舞うかあるいはothersに突っ込まれる
     bool req_arg = false;//直前のオプションが引数を必要とする場合にT
-    bool set_default = false; // 直前のオプションにデフォルト引数が指定されている時にT
-    std::string previous_flag_id="";
-    for(; i < argc; ++position)
+    bool maybe_arg = false; // デフォルト引数持ちでかつ引数が指定されてない場合に引数かも知れない
+
+    std::string previous_flag_id = empty_str;//スペース区切りで引数を要求された場合のオプションID
+    for(; position < argc; ++position)
     {
         std::string strargv(argv[position]);
-        if(!is_arg && strargv == "--")
+        if(!forced_arg && strargv == argument_flag)
         {
-            is_arg = true;
+            forced_arg = true;
             continue;
         }
-        if(startswith(strargv,"--"))// long
+        if(this->is_long_name(strargv))// long
         {
             for(auto&& flg:this->flags)
             {
-                if (startswith(strargv,flg.second.long_name,2))
+                if (startswith(strargv,flg.second.long_name,long_token.size() ))
                 {
                     flg.second.exist = true;
                     
                     if (flg.second.require_argument)
-                    {
-                        if (flg.second.long_name.size() > strargv.size() - 2)
-                        {//ここで＝分割指定と＝無し結合指定を探す
-                           split(strargv.substr(2),"=",l,r);//--部分を取り除いたコマンドラインからのロング名
-                           //右側が空でなければそれを引数の値として確定する
-                           //右側が空、かつ左側の長さとロング名の長さが同じ場合は--long=のような変な指定の仕方なのでエラー
-                           //右側が空、かつ左がロング名より長い場合は左側の先頭からロング名の長さ分削ったものを引数の値とする
+                    {// 引数を要求するオプションの場合
+                        //ここで＝分割指定と＝無し結合指定を探す
+                        std::string l,r,sep;
+                        size_t sep_pos;
+                        sep_pos = partition(strargv.substr(long_token.size() ),connect_token,l,sep,r);//--部分を取り除いたコマンドラインからのロング名
+                        if (!r.empty())
+                        {//右側が空でなければそれを引数の値として確定する
+                            flg.second.argument = r;
+                        }
+                        else if (r.empty() && l.size() > flg.second.long_name.size() )
+                        {//右側が空、かつ左がロング名より長い場合は左側の先頭からロング名の長さ分削ったものを引数の値とする
+                            flg.second.argument = l.substr(flg.second.long_name.size());
                         }
                         else//綺麗にロング名だけを指定された場合
                         {
                             req_arg = true;
-                            if (/* デフォルト引数を持っていた場合*/) {
-                                set_default = true;
+                            if (! flg.second.argument.empty())
+                            {// 引数を要求するオプションでかつ、デフォルト引数が設定されている場合
+                             // この場合は、次がオプション形式の書き方をしていなければその値を引数とする
+                                maybe_arg = true;
                             }
                         }
                     }
                     else //引数を要求しないオプション
                     {//フラグを全て無効にする
-
+                        req_arg = false;
+                        maybe_arg = false;
+                        forced_arg = false;
                     }
                     continue;
                 }
-                
             }
         }
-        else if ()// short
+        else if (this->is_short_name(strargv))// short
         {
-            /* code */
-        }
-        
-        else
-        {
-            for(auto&& sb:this->sub_commands)
+            size_t slen = strargv.size();
+            bool req_arg_s = false;
+            for(size_t i = 1; i < slen; ++i)
             {
+                for(auto&& flg:this->flags)
+                {
+                    if (strargv[i] == flg.second.short_name[0])
+                    {
+                        flg.second.exist = true;
+                        req_arg_s = flg.second.require_argument;
+                    }
+                    else if (req_arg_s && req_arg_s)
+                    {//マッチしない場合かつ直前のオプションが引数をとる場合
+                        //マッチしない部分を含めそれ以降を引数として扱う
+                        this->flags[previous_flag_id].argument = strargv.substr(i);
+                        break;
+                    }
+                    else
+                    {//設定されていないオプションが渡された
+                        return INVALID_FLAG;
+                    }
+                }
+            }
+            req_arg = req_arg_s;
+            continue;
+        }
+        else if(req_arg)
+        {
+            this->flags[previous_flag_id].argument = strargv;
+        }
+        else
+        {//何のオプションにも該当しない場合
+        
+            if (forced_arg)
+            {
+                this->flags[previous_flag_id].argument = strargv;
+                continue;
+            }
+            for(auto&& sb:this->sub_commands)
+            {//いずれのオプションにもマッチしなかった場合にサブコマンドの可能性を探る
                 if(sb.first==strargv)
                 {
+                    sb.second.exist = true;
                     return sb.second.parse(argc,argv,position);
                 }
             }
-            this->others.push_back(argv[position]);
+            if (maybe_arg)
+            {//直前のオプションが引数を要求しているかつ、デフォルト引数が設定されている場合
+                if(!this->is_opt(strargv))
+                {
+                    this->flags[previous_flag_id].argument = strargv;
+                }
+                maybe_arg = false;
+            }
+            else if (req_arg)
+            {//直前のオプションが引数を要求する場合
+                this->flags[previous_flag_id].argument = strargv;
+                if(!this->is_opt(strargv))
+                {
+                    return MISSING_ARGUMENT;
+                }
+                maybe_arg = false;
+                req_arg = false;
+            }
+            else
+            {//全てに当てはまらない
+                char * tmp = const_cast<char*>(argv[position]);
+                this->others.push_back(tmp);
+            }
         }
     }
-    return 1;
+    return OK;
 }
 
 Command &Command::flag(const char *id, const char *short_name, const char *long_name, bool require_argument, const char * default_argument)

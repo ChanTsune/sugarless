@@ -10,5 +10,11 @@ int main(int argc, char const *argv[])
         .flag("max", "M", "max", true)
         .sub_command("clone",clone,true);
 
+    git.parse(argc,argv);
+
+
+    cout << git << endl;
+
+
     return 0;
 }
