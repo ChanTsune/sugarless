@@ -1,5 +1,5 @@
 CXX = clang++
-CXX_FLAGS = --std=c++14
+CXX_FLAGS = -Wall --std=c++14
 
 .PHONY:all
 
