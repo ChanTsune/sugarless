@@ -86,9 +86,9 @@ const static char * OK_MESSAGE = "parse complete";
 const static char * MISSING_ARGUMENT_MESSAGE = "require argument";
 const static char * INVALID_FLAG_MESSAGE = " invalid option";
 
-const char * get_error_message(int errno)
+const char * get_error_message(int errornumber)
 {
-    switch (errno)
+    switch (errornumber)
     {
         case OK:
             return OK_MESSAGE;
@@ -106,7 +106,7 @@ class Command
 {
   private:
     std::map<std::string,Flag,std::less<>> flags;
-    std::map<std::string,Command,std::less<>> sub_commands;
+    std::map<std::string,Command*,std::less<>> sub_commands;
     bool exist;
 
     bool is_long_name(std::string &name);
@@ -140,7 +140,7 @@ std::basic_ostream<_Elme, _Traits> &operator<<(std::basic_ostream<_Elme, _Traits
     {
         stream << std::boolalpha
                 << subc.first << " ::: " << std::endl
-                << subc.second << std::endl 
+                << *(subc.second) << std::endl 
                 << std::noboolalpha;
     }
     
@@ -179,7 +179,7 @@ int Command::parse(int argc,char const* argv[],int position)
     bool req_arg = false;//直前のオプションが引数を必要とする場合にT
     bool maybe_arg = false; // デフォルト引数持ちでかつ引数が指定されてない場合に引数かも知れない
 
-    std::string previous_flag_id = empty_str;//スペース区切りで引数を要求された場合のオプションID
+    std::string previous_flag_id = empty_str;//直前のオプションが引数を要求する場合のフラグID
     for(; position < argc; ++position)
     {
         std::string strargv(argv[position]);
@@ -188,60 +188,60 @@ int Command::parse(int argc,char const* argv[],int position)
             forced_arg = true;
             continue;
         }
-        if(this->is_long_name(strargv))// long
-        {
+        if(this->is_long_name(strargv))
+        {// long
             for(auto&& flg:this->flags)
             {
                 if (startswith(strargv,flg.second.long_name,long_token.size() ))
-                {
+                {// 引数の先頭がロング名と一致する場合
                     flg.second.exist = true;
                     
                     if (flg.second.require_argument)
                     {// 引数を要求するオプションの場合
                         //ここで＝分割指定と＝無し結合指定を探す
                         std::string l,r,sep;
-                        size_t sep_pos;
-                        sep_pos = partition(strargv.substr(long_token.size() ),connect_token,l,sep,r);//--部分を取り除いたコマンドラインからのロング名
+                        partition(strargv.substr(long_token.size() ),connect_token,l,sep,r);//--部分を取り除いたコマンドラインからのロング名
                         if (!r.empty())
                         {//右側が空でなければそれを引数の値として確定する
                             flg.second.argument = r;
-                        }
+                        }// end if
                         else if (r.empty() && l.size() > flg.second.long_name.size() )
                         {//右側が空、かつ左がロング名より長い場合は左側の先頭からロング名の長さ分削ったものを引数の値とする
                             flg.second.argument = l.substr(flg.second.long_name.size());
-                        }
-                        else//綺麗にロング名だけを指定された場合
-                        {
+                        }// end else if
+                        else
+                        {//綺麗にロング名だけを指定された場合
+                            previous_flag_id = flg.first;
                             req_arg = true;
                             if (! flg.second.argument.empty())
                             {// 引数を要求するオプションでかつ、デフォルト引数が設定されている場合
                              // この場合は、次がオプション形式の書き方をしていなければその値を引数とする
                                 maybe_arg = true;
                             }
-                        }
-                    }
-                    else //引数を要求しないオプション
-                    {//フラグを全て無効にする
-                        req_arg = false;
-                        maybe_arg = false;
-                        forced_arg = false;
-                    }
-                    continue;
-                }
-            }
-        }
+                        }//end else
+                    }//end if
+                    break;// ロング名とマッチしているからそれ以上の比較は必要ないためループ終了
+                }// end if
+            }// end for
+        }// end if
         else if (this->is_short_name(strargv))// short
         {
             size_t slen = strargv.size();
             bool req_arg_s = false;
-            for(size_t i = 1; i < slen; ++i)
+            for(size_t i = short_token.size(); i < slen; ++i)
             {
                 for(auto&& flg:this->flags)
                 {
                     if (strargv[i] == flg.second.short_name[0])
                     {
                         flg.second.exist = true;
+                        if(req_arg_s && flg.second.argument.empty())
+                        {//直前のオプションが引数を要求してかつデフォルト引数が設定されていない場合
+                            return MISSING_ARGUMENT;
+                        }
                         req_arg_s = flg.second.require_argument;
+                        previous_flag_id = flg.first;
+                        break;
                     }
                     else if (req_arg_s && req_arg_s)
                     {//マッチしない場合かつ直前のオプションが引数をとる場合
@@ -274,8 +274,8 @@ int Command::parse(int argc,char const* argv[],int position)
             {//いずれのオプションにもマッチしなかった場合にサブコマンドの可能性を探る
                 if(sb.first==strargv)
                 {
-                    sb.second.exist = true;
-                    return sb.second.parse(argc,argv,position);
+                    sb.second->exist = true;
+                    return sb.second->parse(argc,argv,position);
                 }
             }
             if (maybe_arg)
@@ -323,6 +323,7 @@ bool Command::has(const char *id)
 }
 const char *Command::get(const char *id)
 {
+    std::cout << "get called " << id << " : " << this->flags[std::string(id)].argument << std::endl;
     return this->flags[std::string(id)].argument.c_str();
 }
 
@@ -335,17 +336,17 @@ Command &Command::sub_command(const char *command_name,Command &cmd,bool inherit
             cmd.flags[flg.first] = flg.second;
         }
     }
-    this->sub_commands[std::string(command_name)] = cmd;
+    this->sub_commands[std::string(command_name)] = &cmd;
     return *this;
 }
 bool Command::has_sub_command(const char*command_name)
 {
-    return this->sub_commands[std::string(command_name)].exist;
+    return this->sub_commands[std::string(command_name)]->exist;
 }
 
 Command Command::get_subcommand(const char *command_name)
 {
-    return this->sub_commands[std::string(command_name)];
+    return *(this->sub_commands[std::string(command_name)]);
 }
 
 

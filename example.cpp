@@ -10,10 +10,20 @@ int main(int argc, char const *argv[])
         .flag("max", "M", "max", true)
         .sub_command("clone",clone,true);
 
-    git.parse(argc,argv);
+    int i;
+    if (! (i = git.parse(argc,argv)) ) {
+        sugarless::get_error_message(i);
+    }
+    
 
 
     cout << git << endl;
+
+    
+    if (clone.has("max")) {
+        cout << "clone max:" << endl;
+        cout << clone.get("max") << endl;
+    }
 
 
     return 0;
