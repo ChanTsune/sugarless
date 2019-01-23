@@ -186,6 +186,10 @@ int Command::parse(int argc,char const* argv[],int position)
             forced_arg = true;
             continue;
         }
+        if(forced_arg)
+        {
+            goto ARGUMENTS;
+        }
         if(this->is_long_name(strargv))
         {// long
             for(auto&& flg:this->flags)
@@ -256,11 +260,6 @@ int Command::parse(int argc,char const* argv[],int position)
         else
         {//何のオプションにも該当しない場合
         
-            if (forced_arg)
-            {
-                this->flags[previous_flag_id].argument = strargv;
-                continue;
-            }
             for(auto&& sb:this->sub_commands)
             {//いずれのオプションにもマッチしなかった場合にサブコマンドの可能性を探る
                 if(sb.first==strargv)
@@ -269,6 +268,7 @@ int Command::parse(int argc,char const* argv[],int position)
                     return sb.second->parse(argc,argv,position);
                 }
             }
+            ARGUMENTS:
             if (maybe_arg)
             {//直前のオプションが引数を要求しているかつ、デフォルト引数が設定されている場合
                 if(!this->is_opt(strargv))
