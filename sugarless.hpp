@@ -110,7 +110,6 @@ class Command
 
     bool is_long_name(std::string &name);
     bool is_short_name(std::string &name);
-
     bool is_opt(std::string &name);
 
   public:
@@ -229,33 +228,26 @@ int Command::parse(int argc,char const* argv[],int position)
             bool req_arg_s = false;
             for(size_t i = short_token.size(); i < slen; ++i)
             {
+                bool short_muched = false;
                 for(auto&& flg:this->flags)
                 {
                     if (strargv[i] == flg.second.short_name[0])
                     {
                         flg.second.exist = true;
-                        if(req_arg_s && flg.second.argument.empty())
-                        {//直前のオプションが引数を要求してかつデフォルト引数が設定されていない場合
-                            return MISSING_ARGUMENT;
-                        }
                         req_arg_s = flg.second.require_argument;
                         previous_flag_id = flg.first;
+                        short_muched = true;
                         break;
                     }
-                    else if (req_arg_s && req_arg_s)
-                    {//マッチしない場合かつ直前のオプションが引数をとる場合
-                        //マッチしない部分を含めそれ以降を引数として扱う
-                        this->flags[previous_flag_id].argument = strargv.substr(i);
-                        break;
-                    }
-                    else
-                    {//設定されていないオプションが渡された
-                        return INVALID_FLAG;
-                    }
+                }
+                if(!short_muched && req_arg_s)
+                {//直前のオプションが引数をとる場合
+                    // 現在のstrargv[i]が他のショート名に含まれていなければそれ以降を引数とする
+                    this->flags[previous_flag_id].argument = strargv.substr(i);
+                    break;
                 }
             }
             req_arg = req_arg_s;
-            continue;
         }
         else if(req_arg)
         {

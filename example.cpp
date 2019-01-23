@@ -8,6 +8,7 @@ int main(int argc, char const *argv[])
     git.flag("overwrite", "w", "overwrite")
         .flag("output", "o", "output", "./a.out")
         .flag("max", "M", "max", true)
+        .flag("min","m","min",true)
         .sub_command("clone",clone,true);
 
     int i;
