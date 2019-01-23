@@ -7,7 +7,6 @@
 #include <vector>
 #include <ostream>
 
-#include <iostream>
 
 namespace sugarless
 {
@@ -314,7 +313,6 @@ bool Command::has(const char *id)
 }
 const char *Command::get(const char *id)
 {
-    std::cout << "get called " << id << " : " << this->flags[std::string(id)].argument << std::endl;
     return this->flags[std::string(id)].argument.c_str();
 }
 
