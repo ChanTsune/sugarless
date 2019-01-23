@@ -4,7 +4,6 @@
 
 #include <map>
 #include <string>
-#include <cstring>
 #include <vector>
 #include <ostream>
 
@@ -218,8 +217,8 @@ int Command::parse(int argc,char const* argv[],int position)
                              // この場合は、次がオプション形式の書き方をしていなければその値を引数とする
                                 maybe_arg = true;
                             }
-                        }//end else
-                    }//end if
+                        }// end else
+                    }// end if
                     break;// ロング名とマッチしているからそれ以上の比較は必要ないためループ終了
                 }// end if
             }// end for
