@@ -57,13 +57,13 @@ inline bool startswith(const std::basic_string<_Elme> target,const std::basic_st
 class Flag
 {
     public:
-    std::string short_name;
+    char short_name;
     std::string long_name;
     std::string argument;
     bool require_argument;
     bool exist;
     Flag(void){};
-    Flag(const char* short_name,const char * long_name,bool require_argument,const char * argument)
+    Flag(const char short_name,const char * long_name,bool require_argument,const char * argument)
     {
         this->short_name = short_name;
         this->long_name = long_name;
@@ -115,8 +115,8 @@ class Command
     std::vector<char *> others;
 
     int parse(int argc,char const* argv[],int position=1);
-    Command &flag(const char *id, const char *short_name, const char *long_name, bool require_argument=false, const char * default_argument=empty_str.c_str());
-    Command &flag(const char *id, const char *short_name, const char *long_name, const char * default_argument);
+    Command &flag(const char *id, const char short_name, const char *long_name, bool require_argument=false, const char * default_argument=empty_str.c_str());
+    Command &flag(const char *id, const char short_name, const char *long_name, const char * default_argument);
     bool has(const char *id);
     const char *get(const char *id);
 
@@ -234,7 +234,7 @@ int Command::parse(int argc,char const* argv[],int position)
                 bool short_muched = false;
                 for(auto&& flg:this->flags)
                 {
-                    if (strargv[i] == flg.second.short_name[0])
+                    if (strargv[i] == flg.second.short_name)
                     {
                         flg.second.exist = true;
                         req_arg_s = flg.second.require_argument;
@@ -296,13 +296,13 @@ int Command::parse(int argc,char const* argv[],int position)
     return OK;
 }
 
-Command &Command::flag(const char *id, const char *short_name, const char *long_name, bool require_argument, const char * default_argument)
+Command &Command::flag(const char *id, const char short_name, const char *long_name, bool require_argument, const char * default_argument)
 {
     //TODO:NULL chack frase
     this->flags[std::string(id)] = Flag(short_name,long_name,require_argument,default_argument);
     return *this;
 }
-Command &Command::flag(const char *id, const char *short_name, const char *long_name, const char * default_argument)
+Command &Command::flag(const char *id, const char short_name, const char *long_name, const char * default_argument)
 {
     this->flags[std::string(id)] = Flag(short_name,long_name,true,default_argument);
     return *this;

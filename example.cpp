@@ -5,10 +5,10 @@ using namespace std;
 int main(int argc, char const *argv[])
 {
     sugarless::Command git,clone;
-    git.flag("overwrite", "w", "overwrite")
-        .flag("output", "o", "output", "./a.out")
-        .flag("max", "M", "max", true)
-        .flag("min","m","min",true)
+    git.flag("overwrite", 'w', "overwrite")
+        .flag("output", 'o', "output", "./a.out")
+        .flag("max", 'M', "max", true)
+        .flag("min",'m',"min",true)
         .sub_command("clone",clone,true);
 
     int i;
