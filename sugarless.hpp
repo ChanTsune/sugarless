@@ -57,15 +57,22 @@ inline bool startswith(const std::basic_string<_Elme> target,const std::basic_st
 class Flag
 {
     public:
-    char short_name;
+    std::string short_name;
     std::string long_name;
     std::string argument;
     bool require_argument;
     bool exist;
     Flag(void){};
-    Flag(const char short_name,const char * long_name,bool require_argument,const char * argument)
+    Flag(const char* short_name,const char * long_name,bool require_argument,const char * argument)
     {
-        this->short_name = short_name;
+        if(short_name == NULL)
+            this->short_name = empty_str;
+        else
+            this->short_name = short_name;
+        if(long_name == NULL)
+            this->long_name = empty_str;
+        else
+            this->long_name = long_name;
         this->long_name = long_name;
         this->require_argument = require_argument;
         this->argument = argument;
@@ -115,8 +122,8 @@ class Command
     std::vector<char *> others;
 
     int parse(int argc,char const* argv[],int position=1);
-    Command &flag(const char *id, const char short_name, const char *long_name, bool require_argument=false, const char * default_argument=empty_str.c_str());
-    Command &flag(const char *id, const char short_name, const char *long_name, const char * default_argument);
+    Command &flag(const char *id, const char *short_name, const char *long_name, bool require_argument=false, const char * default_argument=empty_str.c_str());
+    Command &flag(const char *id, const char *short_name, const char *long_name, const char * default_argument);
     bool has(const char *id);
     const char *get(const char *id);
 
@@ -193,6 +200,7 @@ int Command::parse(int argc,char const* argv[],int position)
         {// long
             for(auto&& flg:this->flags)
             {
+                if (flg.second.long_name.empty()) continue;
                 if (startswith(strargv,flg.second.long_name,long_token.size() ))
                 {// 引数の先頭がロング名と一致する場合
                     flg.second.exist = true;
@@ -234,7 +242,8 @@ int Command::parse(int argc,char const* argv[],int position)
                 bool short_muched = false;
                 for(auto&& flg:this->flags)
                 {
-                    if (strargv[i] == flg.second.short_name)
+                    if (flg.second.short_name.empty()) continue;
+                    if (strargv[i] == flg.second.short_name[0])
                     {
                         flg.second.exist = true;
                         req_arg_s = flg.second.require_argument;
@@ -296,13 +305,13 @@ int Command::parse(int argc,char const* argv[],int position)
     return OK;
 }
 
-Command &Command::flag(const char *id, const char short_name, const char *long_name, bool require_argument, const char * default_argument)
+Command &Command::flag(const char *id, const char *short_name, const char *long_name, bool require_argument, const char * default_argument)
 {
     //TODO:NULL chack frase
     this->flags[std::string(id)] = Flag(short_name,long_name,require_argument,default_argument);
     return *this;
 }
-Command &Command::flag(const char *id, const char short_name, const char *long_name, const char * default_argument)
+Command &Command::flag(const char *id, const char *short_name, const char *long_name, const char * default_argument)
 {
     this->flags[std::string(id)] = Flag(short_name,long_name,true,default_argument);
     return *this;
