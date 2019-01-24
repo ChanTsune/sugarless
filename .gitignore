@@ -2,3 +2,4 @@
 *.obj
 .vscode/
 *.o
+.DS_Store
