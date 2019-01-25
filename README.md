@@ -1,5 +1,5 @@
 # Sugarless
-Sugarless is a simple command line parser for C++.
+Sugarless is a simple command line parser for C++.  
 
 ### How to use
 
@@ -22,14 +22,12 @@ cmd.flag("opt1","o","option1");
 cmd.flag("opt2",NULL,"option2");
 // only short name
 cmd.flag("opt3","3",NULL);
-cmd.flag("opt3","3");
 
 // require argument
 cmd.flag("require_argument","r",NULL,true);
 
 // require argument(with default argument)
 cmd.flag("set_default_argument1","d","default_arg1",true,"default_value");
-cmd.flag("set_default_argument2","d","default_arg2","default_value");
 ```
 
 Create a Command object and set options with the `flag` member function.  
@@ -83,26 +81,26 @@ $ app -a=argument
 ```
 The two above are considered to be identical  
 
-Case of seted -a -b -c options
+Case of seted `-a` `-b` `-c` options  
 ```
 $ app -a -b -c
 $ app -abc
 ```
 The two above are considered to be identical  
 
-You can connect option names and arguments, But it is conditional that the argument string does not contain duplicate characters with other shorts option names.
+You can connect option names and arguments, But it is conditional that the argument string does not contain duplicate characters with other shorts option names.  
 
-Case of seted short options -a -b -c and -a recive argument
+Case of seted short options `-a` `-b` `-c` and `-a` recive argument  
 ```
 $ app -astring  -> $ app -a string //OK
 $ app -abstring -> $ app -a string -b //OK
 $ app -aargument -> $ app -a rgument //NG
-$ app -abash -> $ app -a sh -b //? you need -a bash but this case -b and -a is seted short optin name becaus -a sh -b -a is sugarless's recognition, dupulicate -a is ignored  
+is ignored  
 ```
 After `->` is recognition of Sugarless.  
 
 #### sub command  
-If you set sub command,
+If you set sub command,  
 ```
 $ app sub -a -b
 ```
@@ -111,4 +109,20 @@ In this case, recognition of sugarless is, -a and -b is sub command's options.
 ```
 $ app -a sub -a
 ```
-In this case, recognition of sugarless is, -a is an application option, and -b is a sub option.
+In this case, recognition of sugarless is, -a is an application option, and -b is a sub option.  
+
+#### case of `-`start argumenst  
+
+The next argument of `--` is not recognized as an option.  
+
+If you want to pass the argument `-1` to the` -a` option.  
+
+Bad case  
+```
+$ app -a -1
+```
+
+Correct case  
+```
+$ app -a -- -1
+```
