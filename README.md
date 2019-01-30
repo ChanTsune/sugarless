@@ -1,13 +1,15 @@
-# Sugarless
+# Sugarless  
 Sugarless is a simple command line parser for C++.  
 
-### How to use
+### Installation  
 
 ```cpp
 include "sugarless.hpp"
 ```
 
-### Create Command object
+Include `sugarless.hpp` only.  
+
+### Create Command object  
 
 ```cpp
 sugarless::Command cmd;
@@ -17,11 +19,11 @@ sugarless::Command cmd;
 
 ```cpp
 // short name and long name
-cmd.flag("opt1","o","option1");
+cmd.flag("opt_id_1","o","option1");
 // only long name
-cmd.flag("opt2",NULL,"option2");
+cmd.flag("opt_id_2",NULL,"option2");
 // only short name
-cmd.flag("opt3","3",NULL);
+cmd.flag("opt_id_3","3",NULL);
 
 // require argument
 cmd.flag("require_argument","r",NULL,true);
@@ -40,12 +42,12 @@ If set NULL or empty string (""), skip long name.
 ### Sub command setting  
 Sugarless is supported sub command like `$ git clone ~~~`  
 ```cpp
-sugarless::Command sub_cmd1;
-sugarless::Command sub_cmd2;
+sugarless::Command subcmd1;
+sugarless::Command subcmd2;
 
-cmd.sub_command("sub_command_name",sub_cmd1);
+cmd.subcommand("subcommand_name1",subcmd1);
 //Inherit parent options
-cmd.sub_command("sub_command_name",sub_cmd2,true);
+cmd.subcommand("subcommand_name2",subcmd2,true);
 ```
 
 The first argument is sub command name.  
@@ -60,17 +62,37 @@ Default is `false`
 ```cpp
 cmd.parse(argc,argv);
 ```
-After set all of flags and sub commands,Pass `argc`,`argv` of `main` function as it is.  
+After set all of flags and sub commands, Pass `argc`,`argv` of `main` function as it is.  
 
-### Chack options existing in recived command line options
+### Chack options existing in recived command line options  
 
+```cpp
+cmd.has("opt_id_1")
+```
+If the command line strings contains `-o` or` --option1`, the above function will return `true`, otherwise it will return` false`.  
+
+### Get received argument of option  
+
+```cpp
+cmd.get("require_argument")
+```
+If an option receives an argument, if there is an option character in the command line strings, it returns a pointer to the received argument string.  
+If executed on an option that does not receive an argument, it returns a pointer to the empty string.  
+
+### Chack options existing in recived command line options  
+
+```cpp
+cmd.has_subcommand("subcommand_name1")
+```
+If the command line strings contains `subcommand_name1`, the above function will return `true`, otherwise it will return` false`.  
 
 ### argument syntax  
 Sugarless basically follows the specification of GUN  
 Case of the string start with `-` is mean short option.  
 Case of the string start with `--` is mean long option.  
-If you want to pass the string start with `-` or `--` as an option's argument,
-Insert `--` immediately before.
+If you want to pass the string start with `-` or `--` as an option's argument, Insert `--` immediately before.  
+
+**Unlike GNU, only the immediately following string is not recognized as an option**.  
 
 ### syntax example  
 
@@ -111,18 +133,100 @@ $ app -a sub -a
 ```
 In this case, recognition of sugarless is, -a is an application option, and -b is a sub option.  
 
-#### case of `-`start argumenst  
+#### case of pass an arguments of started by `-`  
 
 The next argument of `--` is not recognized as an option.  
 
-If you want to pass the argument `-1` to the` -a` option.  
+If you want to pass an argument `-1` to ` -a` option.  
 
 Bad case  
 ```
 $ app -a -1
 ```
+In the above case, `-1` is recognized as an option.  
+
 
 Correct case  
 ```
 $ app -a -- -1
+```
+In the above case, `-1` is recognized as an argument to `-a`.  
+
+### example code  
+Reproduc part of the command of git.  
+`clone` and `init`
+
+```cpp
+#include "sugarless.hpp"
+
+using namespace sugaless;
+
+int main(int argc, char const *argv[])
+{
+    Command git,clone,init;
+
+    clone.flag("local","l","local")
+         .flag("shared","s","shared")
+         .flag("reference",NULL,"reference",true)
+         .flag("dissociate",NULL,"dissociate")
+         .flag("quiet","q","quiet")
+         .flag("depth",NULL,"depth");
+
+    init.flag("quiet","q","quiet")
+        .flag("bare",NULL,"bare")
+        .flag("tmp",NULL,"template",true)
+        .flag("sgd",NULL,"separate-git-dir",true)
+        .flag("shared",NULL,"shared");
+
+    git.flag("help",NULL,"help")
+        .subcommand("clone",clone,true)
+        .subcommand("init",init,true);
+
+    // parse command line options
+    git.parse(argc,argv);
+
+    if(git.has_subcommand("init"))
+    {//git init
+        if(init.has("quite"))
+        {// -q or --quiet option
+
+        }
+        if(init.has("bare"))
+        {// --bare
+
+        }
+        if(init.has("tmp"))
+        {
+            // get tmp argument char * 
+            init.get("tmp")
+        }
+        if(init.has("sgd"))
+        {
+            // get sgd argument char * 
+            init.get("sgd")
+        }
+        if(init.has("shared"))
+        {// shared
+
+        }
+
+    }
+    else if(git.has_subcommand("clone"))
+    {// git clone
+        if(clone.has(...))
+        {
+
+        }
+        ....
+
+    }
+    else
+    {
+        if(git.has("help"))
+        {
+            // show help message
+        }
+    }
+    return 0;
+}
 ```
