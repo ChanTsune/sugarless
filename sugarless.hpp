@@ -127,8 +127,8 @@ class Command
     bool has(const char *id);
     const char *get(const char *id);
 
-    Command &sub_command(const char *command_name,Command &cmd,bool inheritanc=false);
-    bool has_sub_command(const char*command_name);
+    Command &subcommand(const char *command_name,Command &cmd,bool inheritanc=false);
+    bool has_subcommand(const char*command_name);
     Command get_subcommand(const char *command_name);
 
     template <class _Elme, class _Traits>
@@ -325,7 +325,7 @@ const char *Command::get(const char *id)
     return this->flags[std::string(id)].argument.c_str();
 }
 
-Command &Command::sub_command(const char *command_name,Command &cmd,bool inheritanc)
+Command &Command::subcommand(const char *command_name,Command &cmd,bool inheritanc)
 {
     // TODO: refactor map merge
     if (inheritanc) {
@@ -337,7 +337,7 @@ Command &Command::sub_command(const char *command_name,Command &cmd,bool inherit
     this->sub_commands[std::string(command_name)] = &cmd;
     return *this;
 }
-bool Command::has_sub_command(const char*command_name)
+bool Command::has_subcommand(const char*command_name)
 {
     return this->sub_commands[std::string(command_name)]->exist;
 }

@@ -9,7 +9,7 @@ int main(int argc, char const *argv[])
         .flag("output", "o", "output", "./a.out")
         .flag("max", "M", "max", true)
         .flag("min","m","min",true)
-        .sub_command("clone",clone,true);
+        .subcommand("clone",clone,true);
 
     int i;
     if (! (i = git.parse(argc,argv)) ) {
