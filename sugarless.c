@@ -2,10 +2,10 @@
 
 #define SUGARLESS_ALEN 32
 
-Command sugarless_create_command(char *name)
+Command sugarless_create_command(char const *name)
 {
     Command cmd;
-    cmd.name = name;
+    cmd.name = (char *)name;
     cmd.flags = malloc(sizeof(Flag *) * SUGARLESS_ALEN);
     cmd.numflags = 0;
     cmd.flglen = SUGARLESS_ALEN;
@@ -46,12 +46,12 @@ int sugarless_set_others(Command *cmd, char const *arg)
 
 int sugarless_destroy_command(Command *cmd)
 {
-    for (size_t i = 0; i < cmd->subcommands; ++i)
+    for (int i = 0; i < cmd->numsubcommands; ++i)
     {
-        sugarless_destroy_command(&cmd->subcommands[i]);
+        sugarless_destroy_command(cmd->subcommands[i]);
     }
     free(cmd->subcommands);
-    for (size_t i = 0; i < cmd->numflags; ++i)
+    for (int i = 0; i < cmd->numflags; ++i)
     {
         sugarless_destroy_flag(cmd->flags[i]);
     }
@@ -108,10 +108,11 @@ bool accsessable_next(int argc, int i)
 }
 Flag *search_long(Command *cmd, char const *arg_name)
 {
-    for (size_t i = 0; i < cmd->numflags; ++i)
+    for (int i = 0; i < cmd->numflags; ++i)
     {
         if (!strcmp(cmd->flags[i]->long_name, arg_name))
         {
+            cmd->flags[i]->is_exist = true;
             return cmd->flags[i];
         }
     }
@@ -119,10 +120,11 @@ Flag *search_long(Command *cmd, char const *arg_name)
 }
 Flag *search_short(Command *cmd, char const *arg_name)
 {
-    for (size_t i = 0; i < cmd->numflags; ++i)
+    for (int i = 0; i < cmd->numflags; ++i)
     {
-        if (!strcmp(cmd->flags[i]->short_name, arg_name))
+        if (!strncmp(cmd->flags[i]->short_name, arg_name, 1))
         {
+            cmd->flags[i]->is_exist = true;
             return cmd->flags[i];
         }
     }
@@ -131,7 +133,7 @@ Flag *search_short(Command *cmd, char const *arg_name)
 Command *search_sub(Command *cmd, char const *arg)
 {
     printf("search_sub called %d\n", cmd->numsubcommands);
-    for (size_t i = 0; i < cmd->numsubcommands; ++i)
+    for (int i = 0; i < cmd->numsubcommands; ++i)
     {
         printf("loop %d", i);
         if (!strcmp(cmd->subcommands[i]->name, arg))
@@ -147,7 +149,7 @@ bool set_arg(Flag *flg, int *i, int argc, char const *argv[])
     {
         if (accsessable_next(argc, *i))
         {
-            flg->arg = argv[++(*i)];
+            flg->arg = (char *)argv[++(*i)];
             return true;
         }
         else
@@ -161,7 +163,7 @@ bool set_arg(Flag *flg, int *i, int argc, char const *argv[])
 bool sugarless_parse(Command *cmd, int argc, char const *argv[], char **error_message)
 {
     bool safe = false;
-    for (int i = 0; i < argc; ++i)
+    for (int i = 1; i < argc; ++i)
     {
         printf("IN PARSE %s\n", argv[i]);
         Command *sub;
@@ -172,18 +174,20 @@ bool sugarless_parse(Command *cmd, int argc, char const *argv[], char **error_me
         }
         else if (!safe && is_long_opt(argv[i]))
         {
-            char *arg_name = &argv[i] + strlen(SUGARLESS_LONG_OPTION_TOKEN);
+            char const *arg_name = argv[i] + strlen(SUGARLESS_LONG_OPTION_TOKEN);
             Flag *flg = search_long(cmd, arg_name);
             set_arg(flg, &i, argc, argv);
         }
         else if (!safe && is_short_opt(argv[i]))
         {
-            char *arg_name = &argv[i] + strlen(SUGARLESS_SHORT_OPTION_TOKEN);
+            char const *arg_name = argv[i] + strlen(SUGARLESS_SHORT_OPTION_TOKEN);
+            printf("short opt %s\n", arg_name);
             Flag *flg;
             while (strlen(arg_name))
             {
                 flg = search_short(cmd, arg_name);
                 ++arg_name;
+                printf("short opt %s\n", arg_name);
             }
             set_arg(flg, &i, argc, argv);
         }
@@ -202,7 +206,7 @@ bool sugarless_parse(Command *cmd, int argc, char const *argv[], char **error_me
 
 bool sugarless_has_flag(Command *cmd, char id)
 {
-    for (size_t i = 0; i < cmd->numflags; ++i)
+    for (int i = 0; i < cmd->numflags; ++i)
     {
         if (cmd->flags[i]->id == id)
         {
@@ -226,7 +230,7 @@ char const *sugarless_get_flag_default_argument(Flag *flg)
 
 bool sugarless_has_subcommand(Command *cmd, Command *sub)
 {
-    for (size_t i = 0; i < cmd->numsubcommands; ++i)
+    for (int i = 0; i < cmd->numsubcommands; ++i)
     {
         if (!strcmp(cmd->subcommands[i]->name, sub->name))
         {
@@ -238,7 +242,7 @@ bool sugarless_has_subcommand(Command *cmd, Command *sub)
 
 bool sugarless_has_subcommand_by_name(Command *cmd, char *sub)
 {
-    for (size_t i = 0; i < cmd->numsubcommands; ++i)
+    for (int i = 0; i < cmd->numsubcommands; ++i)
     {
         if (!strcmp(cmd->subcommands[i]->name, sub))
         {

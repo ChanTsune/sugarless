@@ -7,8 +7,8 @@
 #include <stdbool.h>
 
 #define SUGARLESS_SHORT_OPTION_TOKEN "-"
-#define SUGARLESS_LONG_OPTION_TOKEN  "--"
-#define SUGARLESS_SAFE_TOKEN         "--"
+#define SUGARLESS_LONG_OPTION_TOKEN "--"
+#define SUGARLESS_SAFE_TOKEN "--"
 
 typedef struct flag
 {
@@ -37,7 +37,7 @@ typedef struct command
     int numothers;
 } Command;
 
-Command sugarless_create_command(char *name);
+Command sugarless_create_command(char const *name);
 
 int sugarless_set_subcommand(Command *main, Command *sub);
 
