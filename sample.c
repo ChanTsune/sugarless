@@ -5,12 +5,12 @@
 
 int main(int argc, char const *argv[])
 {
-    SLCommand *cmd = sugarless_command_create(argv[0]);
+    Command *cmd = sugarless_command_create(argv[0]);
     sugarless_command_set_flag(cmd,
                                sugarless_flag_create('h', "h", "help", false, NULL));
     sugarless_command_set_flag(cmd,
                                sugarless_flag_create('v', "v", "version", false, NULL));
-    SLCommand *sub = sugarless_command_copy(cmd);
+    Command *sub = sugarless_command_copy(cmd);
     sugarless_command_set_name(sub, "sub");
     sugarless_command_set_sub(cmd, sub);
     sugarless_command_set_flag(cmd,
