@@ -301,7 +301,6 @@ bool sugarless_parse(Command *cmd, int argc, char const *argv[])
     bool safe = false;
     for (int i = 1; i < argc; ++i)
     {
-        printf("IN PARSE %s\n", argv[i]);
         Command *sub;
         if (is_safe_flag(argv[i]))
         {
@@ -317,13 +316,11 @@ bool sugarless_parse(Command *cmd, int argc, char const *argv[])
         else if (!safe && is_short_opt(argv[i]))
         {
             char const *arg_name = argv[i] + SUGARLESS_SHORT_OPTION_TOKEN_LEN;
-            printf("short opt %s\n", arg_name);
             Flag *flg;
             while (strlen(arg_name))
             {
                 flg = search_short(cmd, arg_name);
                 ++arg_name;
-                printf("short opt %s\n", arg_name);
             }
             set_arg(flg, &i, argc, argv);
         }
