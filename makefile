@@ -7,8 +7,8 @@ CC_FLAGS = -Wall -O3
 
 all:example cexample
 
-example:example.cpp sugarless.hpp
-	$(CXX) $(CXX_FLAGS) example.cpp -o example
+example:example.cpp sugarless.cpp sugarless.hpp
+	$(CXX) $(CXX_FLAGS) example.cpp sugarless.cpp -o example
 
 cexample:sample.c sugarless.c
 	$(CC) $(CC_FLAGS) sample.c sugarless.c -o sample

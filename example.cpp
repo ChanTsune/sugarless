@@ -2,28 +2,27 @@
 #include <iostream>
 
 using namespace std;
+
 int main(int argc, char const *argv[])
 {
-    sugarless::Command git,clone;
-    git.flag("overwrite", "w", "overwrite")
-        .flag("output", "o", "output", "./a.out")
-        .flag("max", "M", "max", true)
-        .flag("min","m","min",true)
-        .subcommand("clone",clone,true);
+    sugarless::Command git(argv[0]),clone("clone");
+    clone.flag('M',"M",NULL,true,"128");
+    git.flag('w', "w", "overwrite")
+        .flag('o', "o", "output", true, "./a.out")
+        .flag('M', "M", "max", true)
+        .flag('m', "m", "min", true)
+        .set(clone);
 
-    int i;
-    if (! (i = git.parse(argc,argv)) ) {
-        sugarless::get_error_message(i);
-    }
-    
-
+    git.parse(argc,argv);
 
     cout << git << endl;
 
-    
-    if (clone.has("max")) {
-        cout << "clone max:" << endl;
-        cout << clone.get("max") << endl;
+    if(git.has("clone")){
+        cout << "has" << endl;
+        if (clone.has('M')) {
+            cout << "clone max:" << endl;
+            cout << clone.get('M') << endl;
+        }
     }
 
 

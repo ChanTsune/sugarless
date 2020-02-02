@@ -4,7 +4,7 @@ Sugarless is a simple command line parser for C++.
 ### Installation  
 
 ```cpp
-include "sugarless.hpp"
+#include "sugarless.hpp"
 ```
 
 Include `sugarless.hpp` only.  
